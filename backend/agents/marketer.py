@@ -2,8 +2,16 @@
 # The Marketing Agent — creates ad copy, scripts, hooks, and manages campaigns.
 # Phase 4: Meta and TikTok Ads tools will be wired in here.
 
-from crewai import Agent
+from crewai import Agent, LLM
 import config
+
+
+def get_llm():
+    return LLM(
+        model=f"openrouter/{config.OPENROUTER_MODEL}",
+        api_key=config.OPENROUTER_API_KEY,
+        base_url=config.OPENROUTER_BASE_URL,
+    )
 
 
 def create_marketer_agent() -> Agent:
@@ -24,11 +32,7 @@ def create_marketer_agent() -> Agent:
             "and scale winners. You think in terms of ROAS, CPA, and margins — not vanity metrics."
         ),
         tools=[],  # Phase 4: add Meta/TikTok ads tools here
-        llm_config={
-            "model": config.OPENROUTER_MODEL,
-            "api_key": config.OPENROUTER_API_KEY,
-            "base_url": config.OPENROUTER_BASE_URL,
-        },
+        llm=get_llm(),
         verbose=True,
         allow_delegation=False,
     )

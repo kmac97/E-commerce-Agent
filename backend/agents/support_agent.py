@@ -2,8 +2,16 @@
 # The Customer Support Agent — handles emails, reviews, refunds, complaints.
 # Phase 5: Gmail and review tools will be wired in here.
 
-from crewai import Agent
+from crewai import Agent, LLM
 import config
+
+
+def get_llm():
+    return LLM(
+        model=f"openrouter/{config.OPENROUTER_MODEL}",
+        api_key=config.OPENROUTER_API_KEY,
+        base_url=config.OPENROUTER_BASE_URL,
+    )
 
 
 def create_support_agent() -> Agent:
@@ -26,11 +34,7 @@ def create_support_agent() -> Agent:
             "You flag serious issues for human review rather than handling them autonomously."
         ),
         tools=[],  # Phase 5: add Gmail and review tools here
-        llm_config={
-            "model": config.OPENROUTER_MODEL,
-            "api_key": config.OPENROUTER_API_KEY,
-            "base_url": config.OPENROUTER_BASE_URL,
-        },
+        llm=get_llm(),
         verbose=True,
         allow_delegation=False,
     )

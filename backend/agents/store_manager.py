@@ -2,8 +2,16 @@
 # The Store Manager Agent — manages Shopify listings, orders, and inventory.
 # Phase 3: Shopify tools will be wired in here.
 
-from crewai import Agent
+from crewai import Agent, LLM
 import config
+
+
+def get_llm():
+    return LLM(
+        model=f"openrouter/{config.OPENROUTER_MODEL}",
+        api_key=config.OPENROUTER_API_KEY,
+        base_url=config.OPENROUTER_BASE_URL,
+    )
 
 
 def create_store_manager_agent() -> Agent:
@@ -29,11 +37,7 @@ def create_store_manager_agent() -> Agent:
             "You proactively flag low stock, unusual order patterns, and opportunities to improve."
         ),
         tools=[],  # Phase 3: add Shopify tools here
-        llm_config={
-            "model": config.OPENROUTER_MODEL,
-            "api_key": config.OPENROUTER_API_KEY,
-            "base_url": config.OPENROUTER_BASE_URL,
-        },
+        llm=get_llm(),
         verbose=True,
         allow_delegation=False,
     )

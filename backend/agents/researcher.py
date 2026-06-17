@@ -1,10 +1,18 @@
 # agents/researcher.py
 # The Researcher Agent — finds and analyses products, niches, and competitors.
 
-from crewai import Agent, Task
+from crewai import Agent, Task, LLM
 from crewai_tools import TavilySearchTool
 
 import config
+
+
+def get_llm():
+    return LLM(
+        model=f"openrouter/{config.OPENROUTER_MODEL}",
+        api_key=config.OPENROUTER_API_KEY,
+        base_url=config.OPENROUTER_BASE_URL,
+    )
 
 
 def create_researcher_agent() -> Agent:
@@ -30,11 +38,7 @@ def create_researcher_agent() -> Agent:
             "You always structure your research clearly with specific numbers and evidence."
         ),
         tools=[search_tool],
-        llm_config={
-            "model": config.OPENROUTER_MODEL,
-            "api_key": config.OPENROUTER_API_KEY,
-            "base_url": config.OPENROUTER_BASE_URL,
-        },
+        llm=get_llm(),
         verbose=True,
         allow_delegation=False,
     )
