@@ -17,6 +17,7 @@ python-telegram-bot>=20.7
 # HTTP & Search
 httpx>=0.26.0
 requests>=2.31.0
+tavily-python>=0.3.0
 
 # Utilities
 pydantic>=2.5.0

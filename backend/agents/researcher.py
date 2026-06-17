@@ -2,7 +2,7 @@
 # The Researcher Agent — finds and analyses products, niches, and competitors.
 
 from crewai import Agent, Task
-from crewai_tools import SerperDevTool
+from crewai_tools import TavilySearchResults
 
 import config
 
@@ -12,7 +12,7 @@ def create_researcher_agent() -> Agent:
     Creates the product and niche researcher agent.
     This agent searches the web, analyses markets, and scores product ideas.
     """
-    search_tool = SerperDevTool(api_key=config.SERPER_API_KEY)
+    search_tool = TavilySearchResults(api_key=config.TAVILY_API_KEY)
 
     return Agent(
         role="E-commerce Product Researcher",

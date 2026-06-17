@@ -42,8 +42,10 @@ SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 # SEARCH
 # ─────────────────────────────────────────
 
+TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
+
+# Legacy Serper (unused — replaced by Tavily)
 SERPER_API_KEY = os.getenv("SERPER_API_KEY")
-SERPER_BASE_URL = "https://google.serper.dev"
 
 # ─────────────────────────────────────────
 # SHOPIFY
@@ -99,7 +101,7 @@ def validate_config():
     }
 
     optional = {
-        "SERPER_API_KEY": SERPER_API_KEY,
+        "TAVILY_API_KEY": TAVILY_API_KEY,
         "SHOPIFY_ACCESS_TOKEN": SHOPIFY_ACCESS_TOKEN,
         "META_ACCESS_TOKEN": META_ACCESS_TOKEN,
         "GMAIL_CLIENT_ID": GMAIL_CLIENT_ID,
