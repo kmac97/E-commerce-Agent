@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>E-commerce AI Agent</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#0f172a" />
+</head>
+<body>
+
+  <!-- HEADER -->
+  <header class="header">
+    <div class="header-inner">
+      <span class="logo">🤖 E-commerce Agent</span>
+      <span id="status-dot" class="status-dot" title="Checking connection..."></span>
+    </div>
+  </header>
+
+  <!-- NAV TABS -->
+  <nav class="tabs">
+    <button class="tab active" data-tab="dashboard">Dashboard</button>
+    <button class="tab" data-tab="research">Research</button>
+    <button class="tab" data-tab="products">Products</button>
+    <button class="tab" data-tab="tasks">Tasks</button>
+  </nav>
+
+  <!-- MAIN CONTENT -->
+  <main class="main">
+
+    <!-- DASHBOARD TAB -->
+    <section id="tab-dashboard" class="tab-content active">
+      <div class="section-title">Overview</div>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-value" id="stat-products">—</div>
+          <div class="stat-label">Products</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="stat-research">—</div>
+          <div class="stat-label">Research</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="stat-tasks">—</div>
+          <div class="stat-label">Tasks Run</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="stat-active">—</div>
+          <div class="stat-label">Active Tasks</div>
+        </div>
+      </div>
+
+      <div class="section-title">Recent Agent Activity</div>
+      <div id="recent-tasks" class="card-list">
+        <div class="loading">Loading...</div>
+      </div>
+
+      <div class="section-title">Latest Research</div>
+      <div id="recent-research" class="card-list">
+        <div class="loading">Loading...</div>
+      </div>
+    </section>
+
+    <!-- RESEARCH TAB -->
+    <section id="tab-research" class="tab-content">
+      <div class="section-title">Saved Research</div>
+
+      <div class="filter-row">
+        <button class="filter-btn active" data-filter="">All</button>
+        <button class="filter-btn" data-filter="product">Products</button>
+        <button class="filter-btn" data-filter="niche">Niches</button>
+        <button class="filter-btn" data-filter="competitor">Competitors</button>
+      </div>
+
+      <div id="research-list" class="card-list">
+        <div class="loading">Loading...</div>
+      </div>
+    </section>
+
+    <!-- PRODUCTS TAB -->
+    <section id="tab-products" class="tab-content">
+      <div class="section-title">Product Pipeline</div>
+
+      <div class="filter-row">
+        <button class="filter-btn active" data-filter="">All</button>
+        <button class="filter-btn" data-filter="idea">Ideas</button>
+        <button class="filter-btn" data-filter="researching">Researching</button>
+        <button class="filter-btn" data-filter="testing">Testing</button>
+        <button class="filter-btn" data-filter="active">Active</button>
+      </div>
+
+      <div id="product-list" class="card-list">
+        <div class="loading">Loading...</div>
+      </div>
+    </section>
+
+    <!-- TASKS TAB -->
+    <section id="tab-tasks" class="tab-content">
+      <div class="section-title">Agent Task History</div>
+      <div id="task-list" class="card-list">
+        <div class="loading">Loading...</div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- RESEARCH MODAL -->
+  <div id="research-modal" class="modal hidden">
+    <div class="modal-box">
+      <button class="modal-close" onclick="closeModal()">✕</button>
+      <div id="modal-content"></div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

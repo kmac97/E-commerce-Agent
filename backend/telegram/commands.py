@@ -1,0 +1,183 @@
+# telegram/commands.py
+# Handles all Telegram bot commands and messages.
+
+import logging
+from telegram import Update
+from telegram.ext import ContextTypes
+from telegram.constants import ParseMode
+
+logger = logging.getLogger(__name__)
+
+
+async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Sent when user types /start"""
+    await update.message.reply_text(
+        "👋 *E-commerce AI Agent online.*\n\n"
+        "I'm your autonomous business assistant. Here's what I can do:\n\n"
+        "🔍 `/research [product/niche]` — Research a product or niche\n"
+        "📦 `/products` — View your product pipeline\n"
+        "✅ `/tasks` — See recent agent activity\n"
+        "📊 `/status` — System status\n"
+        "❓ `/help` — Full command list\n\n"
+        "Or just type naturally and I'll help you out.",
+        parse_mode=ParseMode.MARKDOWN,
+    )
+
+
+async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Full command list"""
+    await update.message.reply_text(
+        "📖 *Commands*\n\n"
+        "*Research*\n"
+        "`/research posture correctors` — Full product research\n"
+        "`/research niche: pet accessories` — Niche research\n"
+        "`/research competitor: gymshark` — Competitor analysis\n\n"
+        "*Store* _(Phase 3)_\n"
+        "`/orders` — Today's orders\n"
+        "`/inventory` — Low stock alerts\n\n"
+        "*Marketing* _(Phase 4)_\n"
+        "`/ads` — Campaign performance\n"
+        "`/hooks [product]` — Generate ad hooks\n\n"
+        "*Support* _(Phase 5)_\n"
+        "`/reviews` — Latest reviews\n"
+        "`/emails` — Unread customer emails\n\n"
+        "*System*\n"
+        "`/products` — Product pipeline\n"
+        "`/tasks` — Agent task history\n"
+        "`/status` — System health\n",
+        parse_mode=ParseMode.MARKDOWN,
+    )
+
+
+async def cmd_research(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Trigger a research task: /research [topic]"""
+    if not context.args:
+        await update.message.reply_text(
+            "Please provide a topic.\n\nExamples:\n"
+            "`/research posture correctors`\n"
+            "`/research niche: pet accessories`\n"
+            "`/research competitor: gymshark`",
+            parse_mode=ParseMode.MARKDOWN,
+        )
+        return
+
+    raw = " ".join(context.args)
+
+    # Detect research type from prefix
+    if raw.lower().startswith("niche:"):
+        topic = raw[6:].strip()
+        research_type = "niche"
+    elif raw.lower().startswith("competitor:"):
+        topic = raw[11:].strip()
+        research_type = "competitor"
+    else:
+        topic = raw
+        research_type = "product"
+
+    await update.message.reply_text(
+        f"🔍 Starting {research_type} research: *{topic}*\n\nI'll notify you when done.",
+        parse_mode=ParseMode.MARKDOWN,
+    )
+
+    # Kick off the agent task
+    import uuid
+    from agents.crew import run_research_task
+    import asyncio
+
+    task_id = str(uuid.uuid4())
+    asyncio.create_task(
+        run_research_task(task_id=task_id, topic=topic, research_type=research_type)
+    )
+
+
+async def cmd_products(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Show the product pipeline"""
+    from database.client import supabase
+
+    result = supabase.table("products").select("name, status, score").order(
+        "created_at", desc=True
+    ).limit(10).execute()
+
+    if not result.data:
+        await update.message.reply_text("No products saved yet. Try `/research [product]` first.")
+        return
+
+    lines = ["📦 *Product Pipeline*\n"]
+    status_emoji = {
+        "idea": "💡", "researching": "🔍", "testing": "🧪",
+        "active": "✅", "dropped": "❌"
+    }
+    for p in result.data:
+        emoji = status_emoji.get(p.get("status", "idea"), "•")
+        score = f" [{p['score']}/10]" if p.get("score") else ""
+        lines.append(f"{emoji} {p['name']}{score} — _{p.get('status', 'idea')}_")
+
+    await update.message.reply_text("\n".join(lines), parse_mode=ParseMode.MARKDOWN)
+
+
+async def cmd_tasks(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Show recent agent tasks"""
+    from database.client import supabase
+
+    result = supabase.table("agent_tasks").select(
+        "agent, task, status, created_at"
+    ).order("created_at", desc=True).limit(8).execute()
+
+    if not result.data:
+        await update.message.reply_text("No agent tasks yet.")
+        return
+
+    lines = ["🤖 *Recent Agent Activity*\n"]
+    status_emoji = {"pending": "⏳", "running": "🔄", "complete": "✅", "failed": "❌"}
+    for t in result.data:
+        emoji = status_emoji.get(t.get("status", "pending"), "•")
+        date = t["created_at"][:10] if t.get("created_at") else ""
+        lines.append(f"{emoji} [{t['agent']}] {t['task'][:50]} _{date}_")
+
+    await update.message.reply_text("\n".join(lines), parse_mode=ParseMode.MARKDOWN)
+
+
+async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """System health check"""
+    import config as cfg
+
+    checks = {
+        "OpenRouter": bool(cfg.OPENROUTER_API_KEY),
+        "Supabase": bool(cfg.SUPABASE_URL and cfg.SUPABASE_KEY),
+        "Serper Search": bool(cfg.SERPER_API_KEY),
+        "Shopify": bool(cfg.SHOPIFY_ACCESS_TOKEN),
+        "Meta Ads": bool(cfg.META_ACCESS_TOKEN),
+        "Gmail": bool(cfg.GMAIL_CLIENT_ID),
+    }
+
+    lines = ["📊 *System Status*\n"]
+    for service, connected in checks.items():
+        emoji = "✅" if connected else "⚠️"
+        status = "connected" if connected else "not configured"
+        lines.append(f"{emoji} {service} — _{status}_")
+
+    lines.append(f"\n🧠 Model: `{cfg.OPENROUTER_MODEL}`")
+
+    await update.message.reply_text("\n".join(lines), parse_mode=ParseMode.MARKDOWN)
+
+
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Handle plain text messages — treat them as research requests or questions.
+    Uses the researcher agent to answer naturally.
+    """
+    text = update.message.text.strip()
+
+    await update.message.reply_text(
+        f"💭 Got it. Looking into: *{text[:100]}*\n\nRunning research now...",
+        parse_mode=ParseMode.MARKDOWN,
+    )
+
+    import uuid
+    from agents.crew import run_research_task
+    import asyncio
+
+    task_id = str(uuid.uuid4())
+    asyncio.create_task(
+        run_research_task(task_id=task_id, topic=text, research_type="product")
+    )
