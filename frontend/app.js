@@ -27,14 +27,31 @@ async function apiFetch(path) {
 
 async function checkStatus() {
   const dot = document.getElementById("status-dot");
+  const label = document.getElementById("status-label");
   const data = await apiFetch("/health");
   if (data && data.status === "ok") {
-    dot.classList.add("online");
-    dot.title = "Connected";
+    dot.className = "status-dot online";
+    if (label) label.textContent = "Live";
   } else {
-    dot.classList.add("offline");
-    dot.title = "Disconnected";
+    dot.className = "status-dot offline";
+    if (label) label.textContent = "Offline";
   }
+}
+
+function animateStat(id, value) {
+  const el = document.getElementById(id);
+  const n = parseInt(value);
+  if (isNaN(n)) { el.textContent = value; return; }
+  const from = parseInt(el.textContent) || 0;
+  if (from === n) return;
+  const start = performance.now();
+  const dur = Math.min(600, 100 + n * 40);
+  const tick = (now) => {
+    const t = Math.min((now - start) / dur, 1);
+    el.textContent = Math.round(from + (n - from) * (1 - Math.pow(1 - t, 3)));
+    if (t < 1) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
 }
 
 // ─────────────────────────────────────────
@@ -71,11 +88,11 @@ async function loadDashboard() {
   if (!data) return;
 
   // Stats
-  document.getElementById("stat-products").textContent = data.products?.length ?? 0;
-  document.getElementById("stat-research").textContent = data.recent_research?.length ?? 0;
-  document.getElementById("stat-tasks").textContent = data.recent_tasks?.length ?? 0;
   const active = (data.recent_tasks || []).filter(t => t.status === "running").length;
-  document.getElementById("stat-active").textContent = active;
+  animateStat("stat-products", data.products?.length ?? 0);
+  animateStat("stat-research", data.recent_research?.length ?? 0);
+  animateStat("stat-tasks", data.recent_tasks?.length ?? 0);
+  animateStat("stat-active", active);
 
   // Recent tasks
   const tasksEl = document.getElementById("recent-tasks");

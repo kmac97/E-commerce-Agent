@@ -51,11 +51,9 @@ SERPER_API_KEY = os.getenv("SERPER_API_KEY")
 # SHOPIFY
 # ─────────────────────────────────────────
 
-SHOPIFY_SHOP_URL = os.getenv("SHOPIFY_SHOP_URL")
-SHOPIFY_API_KEY = os.getenv("SHOPIFY_API_KEY")
-SHOPIFY_API_SECRET = os.getenv("SHOPIFY_API_SECRET")
+SHOPIFY_SHOP_URL = os.getenv("SHOPIFY_STORE_URL") or os.getenv("SHOPIFY_SHOP_URL")
 SHOPIFY_ACCESS_TOKEN = os.getenv("SHOPIFY_ACCESS_TOKEN")
-SHOPIFY_API_VERSION = "2024-01"
+SHOPIFY_API_VERSION = "2024-04"
 
 # ─────────────────────────────────────────
 # META ADS

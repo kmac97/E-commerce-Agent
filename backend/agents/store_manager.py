@@ -1,6 +1,5 @@
 # agents/store_manager.py
 # The Store Manager Agent — manages Shopify listings, orders, and inventory.
-# Phase 3: Shopify tools will be wired in here.
 
 from crewai import Agent, LLM
 import config
@@ -20,10 +19,21 @@ def create_store_manager_agent() -> Agent:
     Creates the Shopify store manager agent.
     Handles product listings, order monitoring, inventory, and pricing.
     """
-    # Phase 3: import and pass Shopify tools here
-    # from tools.shopify_tools import (
-    #     CreateProductTool, UpdateProductTool, GetOrdersTool, GetInventoryTool
-    # )
+    tools = []
+
+    if config.SHOPIFY_ACCESS_TOKEN and config.SHOPIFY_SHOP_URL:
+        from tools.shopify_tools import (
+            GetProductsTool,
+            CreateProductTool,
+            UpdateProductTool,
+            GetOrdersTool,
+        )
+        tools = [
+            GetProductsTool(),
+            CreateProductTool(),
+            UpdateProductTool(),
+            GetOrdersTool(),
+        ]
 
     return Agent(
         role="Shopify Store Manager",
@@ -37,7 +47,7 @@ def create_store_manager_agent() -> Agent:
             "set competitive prices, and keep the store running smoothly. "
             "You proactively flag low stock, unusual order patterns, and opportunities to improve."
         ),
-        tools=[],  # Phase 3: add Shopify tools here
+        tools=tools,
         llm=get_llm(),
         verbose=True,
         allow_delegation=False,

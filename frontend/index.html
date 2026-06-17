@@ -6,24 +6,32 @@
   <title>E-commerce AI Agent</title>
   <link rel="stylesheet" href="style.css" />
   <link rel="manifest" href="manifest.json" />
-  <meta name="theme-color" content="#0f172a" />
+  <meta name="theme-color" content="#060912" />
 </head>
 <body>
 
   <!-- HEADER -->
   <header class="header">
     <div class="header-inner">
-      <span class="logo">🤖 E-commerce Agent</span>
-      <span id="status-dot" class="status-dot" title="Checking connection..."></span>
+      <span class="logo">
+        <span class="logo-mark">⚡</span>
+        Agent<span class="logo-sub"> · E-commerce</span>
+      </span>
+      <div class="status-chip">
+        <span class="status-label" id="status-label">Connecting</span>
+        <span id="status-dot" class="status-dot"></span>
+      </div>
     </div>
   </header>
 
   <!-- NAV TABS -->
   <nav class="tabs">
-    <button class="tab active" data-tab="dashboard">Dashboard</button>
-    <button class="tab" data-tab="research">Research</button>
-    <button class="tab" data-tab="products">Products</button>
-    <button class="tab" data-tab="tasks">Tasks</button>
+    <div class="tab-inner">
+      <button class="tab active" data-tab="dashboard">Dashboard</button>
+      <button class="tab" data-tab="research">Research</button>
+      <button class="tab" data-tab="products">Products</button>
+      <button class="tab" data-tab="tasks">Tasks</button>
+    </div>
   </nav>
 
   <!-- MAIN CONTENT -->
@@ -35,31 +43,35 @@
 
       <div class="stats-grid">
         <div class="stat-card">
+          <div class="stat-icon">📦</div>
           <div class="stat-value" id="stat-products">—</div>
           <div class="stat-label">Products</div>
         </div>
         <div class="stat-card">
+          <div class="stat-icon">🔬</div>
           <div class="stat-value" id="stat-research">—</div>
           <div class="stat-label">Research</div>
         </div>
         <div class="stat-card">
+          <div class="stat-icon">⚡</div>
           <div class="stat-value" id="stat-tasks">—</div>
           <div class="stat-label">Tasks Run</div>
         </div>
         <div class="stat-card">
+          <div class="stat-icon">◉</div>
           <div class="stat-value" id="stat-active">—</div>
-          <div class="stat-label">Active Tasks</div>
+          <div class="stat-label">Active</div>
         </div>
       </div>
 
       <div class="section-title">Recent Agent Activity</div>
       <div id="recent-tasks" class="card-list">
-        <div class="loading">Loading...</div>
+        <div class="loading">Loading</div>
       </div>
 
       <div class="section-title">Latest Research</div>
       <div id="recent-research" class="card-list">
-        <div class="loading">Loading...</div>
+        <div class="loading">Loading</div>
       </div>
     </section>
 
@@ -75,7 +87,7 @@
       </div>
 
       <div id="research-list" class="card-list">
-        <div class="loading">Loading...</div>
+        <div class="loading">Loading</div>
       </div>
     </section>
 
@@ -92,7 +104,7 @@
       </div>
 
       <div id="product-list" class="card-list">
-        <div class="loading">Loading...</div>
+        <div class="loading">Loading</div>
       </div>
     </section>
 
@@ -100,7 +112,7 @@
     <section id="tab-tasks" class="tab-content">
       <div class="section-title">Agent Task History</div>
       <div id="task-list" class="card-list">
-        <div class="loading">Loading...</div>
+        <div class="loading">Loading</div>
       </div>
     </section>
 

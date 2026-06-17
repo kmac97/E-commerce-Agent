@@ -90,6 +90,47 @@ async def cmd_research(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
+async def cmd_orders(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Show recent Shopify orders"""
+    import config as cfg
+    if not cfg.SHOPIFY_ACCESS_TOKEN:
+        await update.message.reply_text("Shopify not connected yet.")
+        return
+    try:
+        from tools.shopify_tools import get_orders_summary
+        summary = await get_orders_summary()
+        await update.message.reply_text(
+            f"🛒 *Store Orders*\n\n"
+            f"Total orders: {summary['total_orders']}\n"
+            f"Total revenue: ${summary['total_revenue']} {summary['currency']}",
+            parse_mode=ParseMode.MARKDOWN,
+        )
+    except Exception as e:
+        await update.message.reply_text(f"Error fetching orders: {str(e)[:200]}")
+
+
+async def cmd_store(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Show store product listings"""
+    import config as cfg
+    if not cfg.SHOPIFY_ACCESS_TOKEN:
+        await update.message.reply_text("Shopify not connected yet.")
+        return
+    try:
+        from tools.shopify_tools import get_products
+        products = await get_products(limit=10)
+        if not products:
+            await update.message.reply_text("No products in your store yet.")
+            return
+        lines = [f"🏪 *Shopify Store* ({len(products)} products)\n"]
+        for p in products:
+            price = p.get("variants", [{}])[0].get("price", "?")
+            status = "✅" if p["status"] == "active" else "📝"
+            lines.append(f"{status} {p['title']} — ${price}")
+        await update.message.reply_text("\n".join(lines), parse_mode=ParseMode.MARKDOWN)
+    except Exception as e:
+        await update.message.reply_text(f"Error fetching store: {str(e)[:200]}")
+
+
 async def cmd_products(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Show the product pipeline"""
     from database.client import supabase
@@ -144,7 +185,7 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     checks = {
         "OpenRouter": bool(cfg.OPENROUTER_API_KEY),
         "Supabase": bool(cfg.SUPABASE_URL and cfg.SUPABASE_KEY),
-        "Serper Search": bool(cfg.SERPER_API_KEY),
+        "Tavily Search": bool(cfg.TAVILY_API_KEY),
         "Shopify": bool(cfg.SHOPIFY_ACCESS_TOKEN),
         "Meta Ads": bool(cfg.META_ACCESS_TOKEN),
         "Gmail": bool(cfg.GMAIL_CLIENT_ID),
