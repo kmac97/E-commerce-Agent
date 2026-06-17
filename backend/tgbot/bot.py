@@ -7,7 +7,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 from telegram.constants import ParseMode
 
 import config
-from telegram.commands import (
+from tgbot.commands import (
     cmd_start,
     cmd_help,
     cmd_research,
