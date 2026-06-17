@@ -12,7 +12,7 @@ def create_researcher_agent() -> Agent:
     Creates the product and niche researcher agent.
     This agent searches the web, analyses markets, and scores product ideas.
     """
-    search_tool = TavilySearchTool(api_key=config.TAVILY_API_KEY)
+    search_tool = TavilySearchTool()
 
     return Agent(
         role="E-commerce Product Researcher",
