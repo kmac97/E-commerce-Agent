@@ -12,6 +12,7 @@ def get_llm():
         model=f"openrouter/{config.OPENROUTER_MODEL}",
         api_key=config.OPENROUTER_API_KEY,
         base_url=config.OPENROUTER_BASE_URL,
+        max_tokens=4096,
     )
 
 

@@ -4,7 +4,7 @@
 // CONFIG
 // Set this to your Hostinger VPS IP/domain + port
 // ─────────────────────────────────────────
-const API_URL = window.API_URL || "http://YOUR_VPS_IP:8000";
+const API_URL = window.API_URL || "http://148.230.120.176:8000";
 
 // ─────────────────────────────────────────
 // API HELPERS

@@ -27,6 +27,7 @@ async def send_telegram_message(text: str, parse_mode: str = ParseMode.MARKDOWN)
     """
     Send a message to your Telegram chat.
     Called by agents to notify you of results and updates.
+    Falls back to plain text if markdown parsing fails.
     """
     global _bot
     if not _bot:
@@ -39,7 +40,16 @@ async def send_telegram_message(text: str, parse_mode: str = ParseMode.MARKDOWN)
             parse_mode=parse_mode,
         )
     except Exception as e:
-        logger.error(f"Failed to send Telegram message: {e}")
+        # Markdown parse error — retry without formatting
+        logger.warning(f"Markdown send failed ({e}), retrying as plain text")
+        try:
+            await _bot.send_message(
+                chat_id=config.TELEGRAM_CHAT_ID,
+                text=text,
+                parse_mode=None,
+            )
+        except Exception as e2:
+            logger.error(f"Failed to send Telegram message: {e2}")
 
 
 async def start_telegram_bot():
