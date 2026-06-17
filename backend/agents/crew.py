@@ -48,7 +48,7 @@ async def run_research_task(task_id: str, topic: str, research_type: str = "prod
             verbose=True,
         )
 
-        result = crew.kickoff()
+        result = await crew.kickoff_async()
         result_text = str(result)
 
         # Calculate duration
