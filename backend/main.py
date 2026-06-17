@@ -21,7 +21,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import config
 from config import validate_config
 from database.client import init_db
-from telegram.bot import start_telegram_bot
+from tgbot.bot import start_telegram_bot
 
 # ─────────────────────────────────────────
 # LOGGING

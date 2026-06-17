@@ -12,7 +12,7 @@ from agents.marketer import create_marketer_agent
 from agents.support_agent import create_support_agent
 from agents.analyst import create_analyst_agent
 from database.client import save_task_log, update_task_log, save_research
-from telegram.bot import send_telegram_message
+from tgbot.bot import send_telegram_message
 
 logger = logging.getLogger(__name__)
 
