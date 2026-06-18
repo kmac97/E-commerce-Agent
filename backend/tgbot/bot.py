@@ -16,6 +16,7 @@ from tgbot.commands import (
     cmd_status,
     cmd_orders,
     cmd_store,
+    cmd_briefing,
     handle_message,
 )
 
@@ -76,6 +77,7 @@ async def start_telegram_bot():
     app.add_handler(CommandHandler("status", cmd_status))
     app.add_handler(CommandHandler("orders", cmd_orders))
     app.add_handler(CommandHandler("store", cmd_store))
+    app.add_handler(CommandHandler("briefing", cmd_briefing))
 
     # Handle plain text messages (chat with the assistant)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))

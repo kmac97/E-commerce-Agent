@@ -203,6 +203,17 @@ async def cmd_tasks(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("\n".join(lines), parse_mode=ParseMode.MARKDOWN)
 
 
+async def cmd_briefing(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Trigger the daily briefing on demand."""
+    await update.message.reply_text("📊 Generating your briefing...")
+    try:
+        from tgbot.briefing import build_briefing
+        briefing = await build_briefing()
+        await update.message.reply_text(briefing, parse_mode=ParseMode.MARKDOWN)
+    except Exception as e:
+        await update.message.reply_text(f"Error generating briefing: {str(e)[:200]}")
+
+
 async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """System health check"""
     import config as cfg
