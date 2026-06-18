@@ -106,6 +106,48 @@ function deleteBtn(onclick) {
   return `<button class="btn-delete" onclick="event.stopPropagation();${onclick}" title="Delete">×</button>`;
 }
 
+function inlineMd(text) {
+  return text
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/`(.+?)`/g, '<code class="md-code">$1</code>');
+}
+
+function renderMarkdown(text) {
+  if (!text) return '';
+  const lines = text.split('\n');
+  let html = '';
+  let inUl = false, inOl = false;
+  const closeList = () => {
+    if (inUl) { html += '</ul>'; inUl = false; }
+    if (inOl) { html += '</ol>'; inOl = false; }
+  };
+  for (const line of lines) {
+    if (/^## /.test(line)) {
+      closeList();
+      html += `<h3 class="md-h2">${inlineMd(line.slice(3))}</h3>`;
+    } else if (/^# /.test(line)) {
+      closeList();
+      html += `<h2 class="md-h1">${inlineMd(line.slice(2))}</h2>`;
+    } else if (/^[-*] /.test(line)) {
+      if (inOl) { html += '</ol>'; inOl = false; }
+      if (!inUl) { html += '<ul class="md-list">'; inUl = true; }
+      html += `<li>${inlineMd(line.slice(2))}</li>`;
+    } else if (/^\d+\. /.test(line)) {
+      if (inUl) { html += '</ul>'; inUl = false; }
+      if (!inOl) { html += '<ol class="md-list">'; inOl = true; }
+      html += `<li>${inlineMd(line.replace(/^\d+\. /, ''))}</li>`;
+    } else if (line.trim() === '') {
+      closeList();
+    } else {
+      closeList();
+      html += `<p class="md-p">${inlineMd(line)}</p>`;
+    }
+  }
+  closeList();
+  return html;
+}
+
 // ─────────────────────────────────────────
 // DELETE (toast + undo)
 // ─────────────────────────────────────────
@@ -348,13 +390,16 @@ async function loadTasks() {
 function openResearch(id) {
   const r = _research[id];
   if (!r) return;
-  const rawOutput = r.data?.raw_output || JSON.stringify(r.data || {}, null, 2);
+  const raw = r.data?.raw_output;
+  const body = raw
+    ? `<div class="md-body">${renderMarkdown(raw)}</div>`
+    : `<pre>${JSON.stringify(r.data || {}, null, 2)}</pre>`;
   document.getElementById("modal-content").innerHTML = `
     <h2>${r.topic}</h2>
     <div class="modal-badges">${badge(r.type, r.type)} ${r.score ? scoreEl(r.score) : ""}</div>
     ${r.notes ? `<div class="modal-section-label">Notes</div><p class="modal-body">${r.notes}</p>` : ""}
     <div class="modal-section-label">Research Output</div>
-    <pre>${rawOutput}</pre>
+    ${body}
   `;
   document.getElementById("research-modal").classList.remove("hidden");
 }

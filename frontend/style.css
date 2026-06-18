@@ -486,6 +486,57 @@ body {
   color: var(--text);
   letter-spacing: -0.01em;
 }
+/* ─── MARKDOWN RENDER ─── */
+.md-body { margin-top: 4px; }
+.md-h1 {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.025em;
+  margin: 22px 0 8px;
+  line-height: 1.2;
+}
+.md-h2 {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.015em;
+  margin: 22px 0 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+  line-height: 1.3;
+}
+.md-h1:first-child, .md-h2:first-child { margin-top: 0; }
+.md-p {
+  font-size: 14px;
+  color: var(--muted2);
+  line-height: 1.75;
+  margin: 6px 0;
+}
+.md-p strong { color: var(--text); font-weight: 600; }
+.md-list {
+  padding-left: 20px;
+  margin: 8px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.md-list li {
+  font-size: 14px;
+  color: var(--muted2);
+  line-height: 1.65;
+}
+.md-list li strong { color: var(--text); font-weight: 600; }
+.md-code {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 12.5px;
+  font-family: 'Menlo', 'Monaco', monospace;
+  color: var(--accent2);
+}
+
 #modal-content pre {
   background: var(--bg);
   border: 1px solid var(--border);
