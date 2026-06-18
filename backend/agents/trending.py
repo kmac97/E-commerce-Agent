@@ -113,7 +113,8 @@ Be specific and use the data provided. Today's date is 2026."""
         logger.error(f"GPT trending analysis failed: {e}")
         return "❌ Failed to analyse trending products. Try again."
 
-    return f"🔥 *Trending Products Report*\n_(Live data, {__import__('datetime').date.today()})\n\n{report}"
+    today = __import__('datetime').date.today()
+    return f"🔥 *Trending Products Report*\n_Live data, {today}_\n\n{report}"
 
 
 if __name__ == "__main__":

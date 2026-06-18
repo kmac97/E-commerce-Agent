@@ -211,7 +211,10 @@ async def cmd_trending(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         from agents.trending import find_trending_products
         report = await find_trending_products()
-        await update.message.reply_text(report, parse_mode=ParseMode.MARKDOWN)
+        try:
+            await update.message.reply_text(report, parse_mode=ParseMode.MARKDOWN)
+        except Exception:
+            await update.message.reply_text(report, parse_mode=None)
     except Exception as e:
         await update.message.reply_text(f"Error: {str(e)[:200]}")
 
