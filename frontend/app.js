@@ -7,6 +7,10 @@ const _research = {};
 const _products = {};
 const _chatHistory = [];
 
+// Full data arrays for client-side search
+let _researchData = [];
+let _productsData = [];
+
 // ─────────────────────────────────────────
 // API
 // ─────────────────────────────────────────
@@ -300,15 +304,23 @@ async function loadResearch(type = "") {
   currentResearchFilter = type;
   const url = type ? `/api/research/?type=${type}&limit=50` : "/api/research/?limit=50";
   const data = await apiFetch(url);
-  const el = document.getElementById("research-list");
+  if (!data) { document.getElementById("research-list").innerHTML = '<div class="empty">Could not reach server.</div>'; return; }
+  _researchData = data;
+  data.forEach(r => _research[r.id] = r);
+  renderResearch();
+}
 
-  if (!data || !data.length) {
-    el.innerHTML = '<div class="empty">No research saved yet.</div>';
+function renderResearch() {
+  const query = (document.getElementById("research-search")?.value || "").toLowerCase();
+  const filtered = query
+    ? _researchData.filter(r => (r.topic || "").toLowerCase().includes(query) || (r.notes || "").toLowerCase().includes(query))
+    : _researchData;
+  const el = document.getElementById("research-list");
+  if (!filtered.length) {
+    el.innerHTML = `<div class="empty">${query ? "No results." : "No research saved yet."}</div>`;
     return;
   }
-
-  data.forEach(r => _research[r.id] = r);
-  el.innerHTML = data.map(r => `
+  el.innerHTML = filtered.map(r => `
     <div class="card" onclick="openResearch('${r.id}')">
       <div class="card-header">
         <div class="card-title">${r.topic}</div>
@@ -324,6 +336,8 @@ async function loadResearch(type = "") {
   `).join("");
 }
 
+function searchResearch(query) { renderResearch(); }
+
 // ─────────────────────────────────────────
 // PRODUCTS TAB
 // ─────────────────────────────────────────
@@ -331,15 +345,26 @@ async function loadResearch(type = "") {
 async function loadProducts(status = "") {
   const url = status ? `/api/dashboard/products?status=${status}` : "/api/dashboard/products";
   const data = await apiFetch(url);
-  const el = document.getElementById("product-list");
+  if (!data) { document.getElementById("product-list").innerHTML = '<div class="empty">Could not reach server.</div>'; return; }
+  _productsData = data;
+  data.forEach(p => _products[p.id] = p);
+  renderProducts();
+}
 
-  if (!data || !data.length) {
-    el.innerHTML = '<div class="empty">No products in pipeline yet.</div>';
+function renderProducts() {
+  const query = (document.getElementById("products-search")?.value || "").toLowerCase();
+  const filtered = query
+    ? _productsData.filter(p =>
+        (p.name || "").toLowerCase().includes(query) ||
+        (p.niche || "").toLowerCase().includes(query) ||
+        (p.notes || "").toLowerCase().includes(query))
+    : _productsData;
+  const el = document.getElementById("product-list");
+  if (!filtered.length) {
+    el.innerHTML = `<div class="empty">${query ? "No results." : "No products in pipeline yet."}</div>`;
     return;
   }
-
-  data.forEach(p => _products[p.id] = p);
-  el.innerHTML = data.map(p => `
+  el.innerHTML = filtered.map(p => `
     <div class="card" onclick="openProduct('${p.id}')">
       <div class="card-header">
         <div class="card-title">${p.name}</div>
@@ -355,6 +380,8 @@ async function loadProducts(status = "") {
     </div>
   `).join("");
 }
+
+function searchProducts(query) { renderProducts(); }
 
 // ─────────────────────────────────────────
 // TASKS TAB
@@ -400,8 +427,16 @@ function openResearch(id) {
     ${r.notes ? `<div class="modal-section-label">Notes</div><p class="modal-body">${r.notes}</p>` : ""}
     <div class="modal-section-label">Research Output</div>
     ${body}
+    <button class="btn-to-pipeline" onclick="researchToPipeline('${id}')">+ Add to Pipeline</button>
   `;
   document.getElementById("research-modal").classList.remove("hidden");
+}
+
+function researchToPipeline(id) {
+  const r = _research[id];
+  if (!r) return;
+  closeModal();
+  showAddProduct({ name: r.topic, score: r.score, notes: r.notes });
 }
 
 function openProduct(id) {
@@ -446,24 +481,24 @@ document.getElementById("research-modal").addEventListener("click", function(e) 
 // ADD FORMS
 // ─────────────────────────────────────────
 
-function showAddProduct() {
+function showAddProduct(prefill = {}) {
   document.getElementById("form-content").innerHTML = `
     <h2 style="margin-bottom:18px;font-size:17px;font-weight:700;letter-spacing:-0.02em">Add Product</h2>
     <div class="form-group">
       <label class="form-label">Name *</label>
-      <input class="form-input" id="f-name" placeholder="e.g. Bamboo phone case" />
+      <input class="form-input" id="f-name" placeholder="e.g. Bamboo phone case" value="${prefill.name || ''}" />
     </div>
     <div class="form-group">
       <label class="form-label">Niche</label>
-      <input class="form-input" id="f-niche" placeholder="e.g. Eco-friendly accessories" />
+      <input class="form-input" id="f-niche" placeholder="e.g. Eco-friendly accessories" value="${prefill.niche || ''}" />
     </div>
     <div class="form-group">
       <label class="form-label">Score (1–10)</label>
-      <input class="form-input" id="f-score" type="number" min="1" max="10" placeholder="Optional" />
+      <input class="form-input" id="f-score" type="number" min="1" max="10" placeholder="Optional" value="${prefill.score || ''}" />
     </div>
     <div class="form-group">
       <label class="form-label">Notes</label>
-      <textarea class="form-input" id="f-notes" rows="3" placeholder="Initial thoughts..."></textarea>
+      <textarea class="form-input" id="f-notes" rows="3" placeholder="Initial thoughts...">${prefill.notes || ''}</textarea>
     </div>
     <button class="form-submit" onclick="submitAddProduct()">Add to Pipeline</button>
   `;
@@ -517,8 +552,34 @@ async function submitAddResearch() {
     topic,
     type: document.getElementById("f-type").value,
   });
-  if (res) { closeFormModal(); showToast(`Research started for "${topic}"`); }
-  else { btn.disabled = false; btn.textContent = "Start Research"; showToast("Failed to start", null, "error"); }
+  if (res) {
+    closeFormModal();
+    showToast(`Research started for "${topic}"`);
+    pollTask(res.task_id, topic);
+  } else {
+    btn.disabled = false; btn.textContent = "Start Research";
+    showToast("Failed to start", null, "error");
+  }
+}
+
+function pollTask(taskId, label) {
+  if (!taskId) return;
+  const interval = setInterval(async () => {
+    const task = await apiFetch(`/api/agents/status/${taskId}`);
+    if (!task) return;
+    if (task.status === "complete") {
+      clearInterval(interval);
+      showToast(`✓ Research done: "${label}"`);
+      const activeTab = document.querySelector(".tab.active")?.dataset.tab;
+      if (activeTab === "research") loadResearch(currentResearchFilter);
+      if (activeTab === "dashboard") loadDashboard();
+      if (activeTab === "tasks") loadTasks();
+    } else if (task.status === "failed") {
+      clearInterval(interval);
+      showToast(`Research failed: "${label}"`, null, "error");
+    }
+  }, 5000);
+  setTimeout(() => clearInterval(interval), 600000); // 10min max
 }
 
 function closeFormModal() {

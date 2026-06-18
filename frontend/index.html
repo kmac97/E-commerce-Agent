@@ -94,6 +94,10 @@
         <button class="add-btn" onclick="showAddResearch()">+ Research</button>
       </div>
 
+      <div class="search-row">
+        <input class="search-input" id="research-search" placeholder="Search research..." oninput="searchResearch(this.value)" autocomplete="off" />
+      </div>
+
       <div class="filter-row">
         <button class="filter-btn active" data-filter="">All</button>
         <button class="filter-btn" data-filter="product">Products</button>
@@ -111,6 +115,10 @@
       <div class="section-title">
         Product Pipeline
         <button class="add-btn" onclick="showAddProduct()">+ Product</button>
+      </div>
+
+      <div class="search-row">
+        <input class="search-input" id="products-search" placeholder="Search products..." oninput="searchProducts(this.value)" autocomplete="off" />
       </div>
 
       <div class="filter-row">
