@@ -188,6 +188,40 @@ class UpdateProductTool(BaseTool):
             return f"✅ Product {product['id']} updated: {product['title']} | {product['status']}"
 
 
+# ─── INVENTORY TOOL ───────────────────────────
+
+class GetInventoryTool(BaseTool):
+    name: str = "get_shopify_inventory"
+    description: str = (
+        "Get inventory levels for all products. "
+        "Returns products with their stock quantities. "
+        "Use to check for low stock items."
+    )
+
+    def _run(self, low_stock_threshold: int = 10) -> str:
+        import asyncio
+        return asyncio.run(self._async_run(low_stock_threshold))
+
+    async def _async_run(self, low_stock_threshold: int = 10) -> str:
+        async with httpx.AsyncClient() as client:
+            res = await client.get(
+                shopify_url("products.json?limit=250"),
+                headers=get_headers(),
+            )
+            if res.status_code != 200:
+                return f"Error fetching inventory: {res.status_code}"
+            products = res.json().get("products", [])
+            low = []
+            for p in products:
+                for v in p.get("variants", []):
+                    qty = v.get("inventory_quantity", 0)
+                    if qty is not None and qty <= low_stock_threshold:
+                        low.append(f"- {p['title']} (variant: {v.get('title','')}) — {qty} left")
+            if not low:
+                return f"All products have stock above {low_stock_threshold} units."
+            return f"⚠️ Low stock ({len(low)} items):\n" + "\n".join(low)
+
+
 # ─── CONVENIENCE FUNCTIONS (for API routes) ────
 
 async def get_products(limit: int = 50) -> list:
@@ -208,6 +242,42 @@ async def get_orders(status: str = "any", limit: int = 50) -> list:
         )
         res.raise_for_status()
         return res.json().get("orders", [])
+
+
+async def get_inventory(threshold: int = 10) -> list:
+    """Return products below the stock threshold."""
+    async with httpx.AsyncClient() as client:
+        res = await client.get(
+            shopify_url("products.json?limit=250"),
+            headers=get_headers(),
+        )
+        res.raise_for_status()
+        products = res.json().get("products", [])
+        low = []
+        for p in products:
+            for v in p.get("variants", []):
+                qty = v.get("inventory_quantity")
+                if qty is not None and qty <= threshold:
+                    low.append({
+                        "product_id": p["id"],
+                        "title": p["title"],
+                        "variant": v.get("title", "Default"),
+                        "quantity": qty,
+                        "price": v.get("price"),
+                    })
+        return low
+
+
+async def update_product(product_id: str, updates: dict) -> dict:
+    """Update a Shopify product by ID. updates dict can include title, body_html, variants etc."""
+    async with httpx.AsyncClient() as client:
+        res = await client.put(
+            shopify_url(f"products/{product_id}.json"),
+            json={"product": updates},
+            headers=get_headers(),
+        )
+        res.raise_for_status()
+        return res.json().get("product", {})
 
 
 async def get_orders_summary() -> dict:

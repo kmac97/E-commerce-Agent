@@ -203,6 +203,66 @@ async def cmd_tasks(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("\n".join(lines), parse_mode=ParseMode.MARKDOWN)
 
 
+async def cmd_inventory(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Check for low stock items."""
+    await update.message.reply_text("🔍 Checking inventory...")
+    try:
+        from tgbot.store_monitor import check_low_stock
+        msg = await check_low_stock(threshold=10)
+        if msg:
+            await update.message.reply_text(msg, parse_mode=ParseMode.MARKDOWN)
+        else:
+            await update.message.reply_text("✅ All products have healthy stock levels (10+ units).")
+    except Exception as e:
+        await update.message.reply_text(f"Error: {str(e)[:200]}")
+
+
+async def cmd_prices(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Get price monitoring suggestions."""
+    await update.message.reply_text("💰 Checking competitor prices, give me a moment...")
+    try:
+        from tgbot.store_monitor import get_price_suggestions
+        msg = await get_price_suggestions()
+        if msg:
+            await update.message.reply_text(msg, parse_mode=ParseMode.MARKDOWN)
+        else:
+            await update.message.reply_text("No active products to check, or Tavily not configured.")
+    except Exception as e:
+        await update.message.reply_text(f"Error: {str(e)[:200]}")
+
+
+async def cmd_optimise(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Optimise a product listing: /optimise [product_id]"""
+    if not context.args:
+        # No ID given — show list of products to choose from
+        try:
+            import config as cfg
+            if not cfg.SHOPIFY_ACCESS_TOKEN:
+                await update.message.reply_text("Shopify not connected.")
+                return
+            from tools.shopify_tools import get_products
+            products = await get_products(limit=20)
+            if not products:
+                await update.message.reply_text("No products in your store.")
+                return
+            lines = ["📝 *Choose a product to optimise:*\n"]
+            for p in products:
+                lines.append(f"`/optimise {p['id']}` — {p['title']}")
+            await update.message.reply_text("\n".join(lines), parse_mode=ParseMode.MARKDOWN)
+        except Exception as e:
+            await update.message.reply_text(f"Error: {str(e)[:200]}")
+        return
+
+    product_id = context.args[0]
+    await update.message.reply_text(f"✍️ Optimising listing {product_id}...")
+    try:
+        from tgbot.store_monitor import optimise_product_listing
+        result = await optimise_product_listing(product_id)
+        await update.message.reply_text(result, parse_mode=ParseMode.MARKDOWN)
+    except Exception as e:
+        await update.message.reply_text(f"Error: {str(e)[:200]}")
+
+
 async def cmd_briefing(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Trigger the daily briefing on demand."""
     await update.message.reply_text("📊 Generating your briefing...")
