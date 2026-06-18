@@ -20,6 +20,7 @@ from tgbot.commands import (
     cmd_inventory,
     cmd_prices,
     cmd_optimise,
+    cmd_trending,
     handle_message,
 )
 
@@ -81,6 +82,7 @@ async def start_telegram_bot():
     app.add_handler(CommandHandler("orders", cmd_orders))
     app.add_handler(CommandHandler("store", cmd_store))
     app.add_handler(CommandHandler("briefing", cmd_briefing))
+    app.add_handler(CommandHandler("trending", cmd_trending))
     app.add_handler(CommandHandler("inventory", cmd_inventory))
     app.add_handler(CommandHandler("prices", cmd_prices))
     app.add_handler(CommandHandler("optimise", cmd_optimise))

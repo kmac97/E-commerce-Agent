@@ -203,6 +203,19 @@ async def cmd_tasks(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("\n".join(lines), parse_mode=ParseMode.MARKDOWN)
 
 
+async def cmd_trending(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Find trending products right now."""
+    await update.message.reply_text(
+        "🔍 Scanning for trending products across TikTok, Shopify and Meta... give me ~30 seconds.",
+    )
+    try:
+        from agents.trending import find_trending_products
+        report = await find_trending_products()
+        await update.message.reply_text(report, parse_mode=ParseMode.MARKDOWN)
+    except Exception as e:
+        await update.message.reply_text(f"Error: {str(e)[:200]}")
+
+
 async def cmd_inventory(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Check for low stock items."""
     await update.message.reply_text("🔍 Checking inventory...")
