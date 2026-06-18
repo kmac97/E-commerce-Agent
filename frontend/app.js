@@ -4,7 +4,7 @@
 // CONFIG
 // Set this to your Hostinger VPS IP/domain + port
 // ─────────────────────────────────────────
-const API_URL = window.API_URL || "http://148.230.120.176:8000";
+const API_URL = window.API_URL || "https://e-comagent.duckdns.org";
 
 // ─────────────────────────────────────────
 // API HELPERS
