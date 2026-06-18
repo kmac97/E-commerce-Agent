@@ -6,6 +6,10 @@
 // ─────────────────────────────────────────
 const API_URL = window.API_URL || "https://e-comagent.duckdns.org";
 
+// Lookup caches so we never embed JSON in onclick attributes
+const _research = {};
+const _products = {};
+
 // ─────────────────────────────────────────
 // API HELPERS
 // ─────────────────────────────────────────
@@ -135,8 +139,9 @@ async function loadDashboard() {
   if (!data.recent_research?.length) {
     researchEl.innerHTML = '<div class="empty">No research saved yet.</div>';
   } else {
+    data.recent_research.forEach(r => _research[r.id] = r);
     researchEl.innerHTML = data.recent_research.slice(0, 5).map(r => `
-      <div class="card" onclick="openResearch('${r.id}', ${JSON.stringify(r).replace(/'/g, "\\'")})">
+      <div class="card" onclick="openResearch('${r.id}')">
         <div class="card-header">
           <div class="card-title">${r.topic}</div>
           <div style="display:flex;gap:6px;align-items:center">
@@ -168,8 +173,9 @@ async function loadResearch(type = "") {
     return;
   }
 
+  data.forEach(r => _research[r.id] = r);
   el.innerHTML = data.map(r => `
-    <div class="card" onclick="openResearch('${r.id}', ${JSON.stringify(r).replace(/'/g, "\\'")})">
+    <div class="card" onclick="openResearch('${r.id}')">
       <div class="card-header">
         <div class="card-title">${r.topic}</div>
         <div style="display:flex;gap:6px;align-items:center">
@@ -198,8 +204,9 @@ async function loadProducts(status = "") {
     return;
   }
 
+  data.forEach(p => _products[p.id] = p);
   el.innerHTML = data.map(p => `
-    <div class="card" onclick="openProduct(${JSON.stringify(p).replace(/"/g, '&quot;')})">
+    <div class="card" onclick="openProduct('${p.id}')">
       <div class="card-header">
         <div class="card-title">${p.name}</div>
         <div style="display:flex;gap:6px;align-items:center">
@@ -246,21 +253,23 @@ async function loadTasks() {
 // MODAL
 // ─────────────────────────────────────────
 
-function openResearch(id, data) {
+function openResearch(id) {
+  const r = _research[id];
+  if (!r) return;
   const modal = document.getElementById("research-modal");
   const content = document.getElementById("modal-content");
-
-  const rawOutput = data?.data?.raw_output || JSON.stringify(data?.data || {}, null, 2);
-
+  const rawOutput = r.data?.raw_output || JSON.stringify(r.data || {}, null, 2);
   content.innerHTML = `
-    <h2>${data.topic}</h2>
-    <p style="margin-bottom:10px">${badge(data.type, data.type)} ${data.score ? scoreEl(data.score) : ""}</p>
+    <h2>${r.topic}</h2>
+    <p style="margin-bottom:10px">${badge(r.type, r.type)} ${r.score ? scoreEl(r.score) : ""}</p>
     <pre>${rawOutput}</pre>
   `;
   modal.classList.remove("hidden");
 }
 
-function openProduct(p) {
+function openProduct(id) {
+  const p = _products[id];
+  if (!p) return;
   const modal = document.getElementById("research-modal");
   const content = document.getElementById("modal-content");
   const meta = [
