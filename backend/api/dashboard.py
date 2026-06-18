@@ -2,8 +2,21 @@
 # Endpoints that power the web dashboard.
 
 from fastapi import APIRouter
+from pydantic import BaseModel
+from typing import Optional
 
 router = APIRouter()
+
+
+class ProductCreate(BaseModel):
+    name: str
+    niche: Optional[str] = None
+    score: Optional[int] = None
+    notes: Optional[str] = None
+
+
+class StatusUpdate(BaseModel):
+    status: str
 
 
 @router.get("/summary")
@@ -47,12 +60,63 @@ async def get_products(status: str = None):
     return result.data
 
 
+@router.post("/products")
+async def create_product(product: ProductCreate):
+    """Manually add a product to the pipeline."""
+    from database.client import save_product
+    result = await save_product(
+        name=product.name,
+        niche=product.niche,
+        score=product.score,
+        notes=product.notes,
+    )
+    return result
+
+
+@router.patch("/products/{product_id}/status")
+async def update_product_status_endpoint(product_id: str, body: StatusUpdate):
+    """Update a product's pipeline status."""
+    from database.client import update_product_status
+    await update_product_status(product_id, body.status)
+    return {"status": "updated"}
+
+
 @router.delete("/products/{product_id}")
 async def delete_product_item(product_id: str):
     """Delete a product from the pipeline."""
     from database.client import delete_product
     await delete_product(product_id)
     return {"status": "deleted"}
+
+
+@router.get("/briefing")
+async def get_briefing():
+    """Return today's briefing data as structured JSON."""
+    import asyncio
+    from datetime import datetime
+    from tgbot.briefing import get_orders_summary, get_recent_research, get_recent_tasks, get_max_tip
+
+    orders, research, tasks = await asyncio.gather(
+        get_orders_summary(),
+        get_recent_research(),
+        get_recent_tasks(),
+    )
+
+    completed = [t for t in tasks if t["status"] == "complete"]
+    failed = [t for t in tasks if t["status"] == "failed"]
+    context = (
+        f"Orders: {orders}. Research topics: {[r['topic'] for r in research]}. "
+        f"Tasks: {len(completed)} complete, {len(failed)} failed."
+    )
+    tip = await get_max_tip(context)
+
+    return {
+        "date": datetime.now().strftime("%A, %d %b %Y"),
+        "orders": orders,
+        "research": research,
+        "tasks": {"completed": len(completed), "failed": len(failed)},
+        "tip": tip,
+    }
 
 
 @router.get("/tasks")
