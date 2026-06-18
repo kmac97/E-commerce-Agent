@@ -204,21 +204,41 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
-    Handle plain text messages — treat them as research requests or questions.
-    Uses the researcher agent to answer naturally.
+    Handle plain text messages.
+    Only triggers research if the message looks like a product/niche query.
+    Otherwise responds with help text.
     """
-    text = update.message.text.strip()
+    text = update.message.text.strip().lower()
 
-    await update.message.reply_text(
-        f"💭 Got it. Looking into: *{text[:100]}*\n\nRunning research now...",
-        parse_mode=ParseMode.MARKDOWN,
-    )
+    # Keywords that suggest a research request
+    research_triggers = [
+        "research", "find", "look up", "analyse", "analyze", "niche",
+        "product", "sell", "dropship", "trending", "winning", "competitor",
+        "how is", "what about", "tell me about",
+    ]
 
-    import uuid
-    from agents.crew import run_research_task
-    import asyncio
+    is_research = any(trigger in text for trigger in research_triggers)
 
-    task_id = str(uuid.uuid4())
-    asyncio.create_task(
-        run_research_task(task_id=task_id, topic=text, research_type="product")
-    )
+    if is_research:
+        await update.message.reply_text(
+            f"🔍 Researching: *{update.message.text[:100]}*\n\nI'll notify you when done.",
+            parse_mode=ParseMode.MARKDOWN,
+        )
+        import uuid
+        from agents.crew import run_research_task
+        import asyncio
+        task_id = str(uuid.uuid4())
+        asyncio.create_task(
+            run_research_task(task_id=task_id, topic=update.message.text, research_type="product")
+        )
+    else:
+        await update.message.reply_text(
+            "Here's what I can do:\n\n"
+            "/research [product] — Research a product\n"
+            "/store — View Shopify listings\n"
+            "/orders — Check orders\n"
+            "/products — Product pipeline\n"
+            "/tasks — Recent agent activity\n"
+            "/status — System health\n\n"
+            "Or type: research posture correctors",
+        )

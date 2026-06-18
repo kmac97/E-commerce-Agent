@@ -85,7 +85,11 @@ function scoreEl(score) {
 
 async function loadDashboard() {
   const data = await apiFetch("/api/dashboard/summary");
-  if (!data) return;
+  if (!data) {
+    document.getElementById("recent-tasks").innerHTML = '<div class="empty">Could not reach server.</div>';
+    document.getElementById("recent-research").innerHTML = '<div class="empty">Could not reach server.</div>';
+    return;
+  }
 
   // Stats
   const active = (data.recent_tasks || []).filter(t => t.status === "running").length;
