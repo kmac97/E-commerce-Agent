@@ -154,6 +154,11 @@ async def update_product_status(product_id: str, status: str):
     supabase.table("products").update({"status": status}).eq("id", product_id).execute()
 
 
+async def delete_product(product_id: str):
+    """Delete a product from the pipeline."""
+    supabase.table("products").delete().eq("id", product_id).execute()
+
+
 # ─────────────────────────────────────────
 # MEMORY
 # ─────────────────────────────────────────

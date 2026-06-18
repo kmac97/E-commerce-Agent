@@ -10,9 +10,9 @@ const API_URL = window.API_URL || "https://e-comagent.duckdns.org";
 // API HELPERS
 // ─────────────────────────────────────────
 
-async function apiFetch(path) {
+async function apiFetch(path, method = "GET") {
   try {
-    const res = await fetch(`${API_URL}${path}`);
+    const res = await fetch(`${API_URL}${path}`, { method });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return await res.json();
   } catch (e) {
@@ -79,6 +79,22 @@ function scoreEl(score) {
   return `<span class="score ${cls}">${score}/10</span>`;
 }
 
+function deleteBtn(onclick) {
+  return `<button class="btn-delete" onclick="event.stopPropagation();${onclick}" title="Delete">×</button>`;
+}
+
+async function deleteResearch(id, el) {
+  if (!confirm("Delete this research?")) return;
+  const res = await apiFetch(`/api/research/${id}`, "DELETE");
+  if (res !== null) el.closest(".card").remove();
+}
+
+async function deleteProduct(id, el) {
+  if (!confirm("Delete this product?")) return;
+  const res = await apiFetch(`/api/dashboard/products/${id}`, "DELETE");
+  if (res !== null) el.closest(".card").remove();
+}
+
 // ─────────────────────────────────────────
 // DASHBOARD TAB
 // ─────────────────────────────────────────
@@ -123,9 +139,13 @@ async function loadDashboard() {
       <div class="card" onclick="openResearch('${r.id}', ${JSON.stringify(r).replace(/'/g, "\\'")})">
         <div class="card-header">
           <div class="card-title">${r.topic}</div>
-          ${badge(r.type, r.type)}
+          <div style="display:flex;gap:6px;align-items:center">
+            ${r.score ? scoreEl(r.score) : ""}
+            ${badge(r.type, r.type)}
+            ${deleteBtn(`deleteResearch('${r.id}',this)`)}
+          </div>
         </div>
-        <div class="card-meta">${timeAgo(r.created_at)}${r.score ? ` · ${scoreEl(r.score)}` : ""}</div>
+        <div class="card-meta">${timeAgo(r.created_at)}</div>
       </div>
     `).join("");
   }
@@ -155,6 +175,7 @@ async function loadResearch(type = "") {
         <div style="display:flex;gap:6px;align-items:center">
           ${r.score ? scoreEl(r.score) : ""}
           ${badge(r.type, r.type)}
+          ${deleteBtn(`deleteResearch('${r.id}',this)`)}
         </div>
       </div>
       <div class="card-meta">${timeAgo(r.created_at)}</div>
@@ -178,12 +199,13 @@ async function loadProducts(status = "") {
   }
 
   el.innerHTML = data.map(p => `
-    <div class="card">
+    <div class="card" onclick="openProduct(${JSON.stringify(p).replace(/"/g, '&quot;')})">
       <div class="card-header">
         <div class="card-title">${p.name}</div>
         <div style="display:flex;gap:6px;align-items:center">
           ${p.score ? scoreEl(p.score) : ""}
           ${badge(p.status || "idea", p.status || "idea")}
+          ${deleteBtn(`deleteProduct('${p.id}',this)`)}
         </div>
       </div>
       ${p.niche ? `<div class="card-meta">Niche: ${p.niche}</div>` : ""}
@@ -234,6 +256,25 @@ function openResearch(id, data) {
     <h2>${data.topic}</h2>
     <p style="margin-bottom:10px">${badge(data.type, data.type)} ${data.score ? scoreEl(data.score) : ""}</p>
     <pre>${rawOutput}</pre>
+  `;
+  modal.classList.remove("hidden");
+}
+
+function openProduct(p) {
+  const modal = document.getElementById("research-modal");
+  const content = document.getElementById("modal-content");
+  const meta = [
+    p.niche ? `Niche: ${p.niche}` : null,
+    p.cost_estimate != null ? `Cost: $${p.cost_estimate}` : null,
+    p.sell_price_estimate != null ? `Sell price: $${p.sell_price_estimate}` : null,
+    p.margin_estimate != null ? `Margin: ${p.margin_estimate}%` : null,
+  ].filter(Boolean).join(" · ");
+  content.innerHTML = `
+    <h2>${p.name}</h2>
+    <p style="margin-bottom:10px">${badge(p.status || "idea", p.status || "idea")} ${p.score ? scoreEl(p.score) : ""}</p>
+    ${meta ? `<p style="margin-bottom:10px;font-size:13px">${meta}</p>` : ""}
+    ${p.notes ? `<p>${p.notes}</p>` : ""}
+    ${p.data ? `<pre>${JSON.stringify(p.data, null, 2)}</pre>` : ""}
   `;
   modal.classList.remove("hidden");
 }

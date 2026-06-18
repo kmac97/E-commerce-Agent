@@ -47,6 +47,14 @@ async def get_products(status: str = None):
     return result.data
 
 
+@router.delete("/products/{product_id}")
+async def delete_product_item(product_id: str):
+    """Delete a product from the pipeline."""
+    from database.client import delete_product
+    await delete_product(product_id)
+    return {"status": "deleted"}
+
+
 @router.get("/tasks")
 async def get_tasks(status: str = None, limit: int = 50):
     """Get agent task history."""
