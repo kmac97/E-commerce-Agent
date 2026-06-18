@@ -241,6 +241,10 @@ body {
 
 /* ─── CARDS ─── */
 .card-list { display: flex; flex-direction: column; gap: 8px; }
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -248,7 +252,14 @@ body {
   padding: 14px 16px;
   cursor: pointer;
   transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
+  animation: card-in 0.22s ease both;
 }
+.card:nth-child(2) { animation-delay: .04s; }
+.card:nth-child(3) { animation-delay: .08s; }
+.card:nth-child(4) { animation-delay: .12s; }
+.card:nth-child(5) { animation-delay: .16s; }
+.card:nth-child(6) { animation-delay: .20s; }
+.card:nth-child(n+7) { animation-delay: .24s; }
 .card:hover {
   border-color: var(--border-lit);
   transform: translateY(-1px);
@@ -422,6 +433,34 @@ body {
   color: var(--text);
   border-color: rgba(255,255,255,0.14);
 }
+.filter-score7 { color: var(--yellow); border-color: rgba(245,158,11,0.2); }
+.filter-score7.active { background: rgba(245,158,11,0.1); color: var(--yellow); border-color: rgba(245,158,11,0.4); }
+
+/* ─── STATUS BREAKDOWN ─── */
+.status-breakdown { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; min-height: 0; }
+
+/* ─── RUNNING TASK SHIMMER ─── */
+@keyframes shimmer { to { background-position: -200% 0; } }
+.task-running-bar {
+  height: 2px;
+  background: linear-gradient(90deg, var(--accent), var(--accent2), var(--accent));
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+  border-radius: 0 0 var(--radius) var(--radius);
+  margin: 8px -16px -14px;
+}
+
+/* ─── EMPTY STATE WITH CTA ─── */
+.empty-cta { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 40px 0; color: var(--muted); }
+.empty-cta-icon { font-size: 28px; opacity: 0.5; }
+.empty-cta-text { font-size: 14px; }
+.empty-cta-btn {
+  background: rgba(99,102,241,0.08); border: 1px solid rgba(99,102,241,0.2);
+  color: var(--accent2); padding: 7px 16px; border-radius: 7px;
+  font-size: 13px; font-weight: 600; cursor: pointer; font-family: var(--font);
+  transition: all 0.15s;
+}
+.empty-cta-btn:hover { background: rgba(99,102,241,0.15); }
 
 /* ─── LOADING / EMPTY ─── */
 .loading {
@@ -656,6 +695,23 @@ body {
 }
 .sort-btn.active { background: rgba(99,102,241,0.1); color: var(--accent2); border-color: rgba(99,102,241,0.25); }
 .sort-btn:hover:not(.active) { color: var(--text); border-color: rgba(255,255,255,0.14); }
+
+/* ─── COPY BUTTON (research modal) ─── */
+.btn-copy {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--surface2); border: 1px solid var(--border);
+  color: var(--muted2); padding: 9px 16px; border-radius: 8px;
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  font-family: var(--font); transition: all 0.15s;
+  margin-top: 22px; margin-left: 8px;
+}
+.btn-copy:hover { border-color: rgba(255,255,255,0.2); color: var(--text); }
+
+/* ─── MODAL ACTIONS ROW ─── */
+.modal-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
+.modal-actions .btn-to-pipeline,
+.modal-actions .btn-copy,
+.modal-actions .btn-edit { margin-top: 0; margin-left: 0; }
 
 /* ─── EDIT BUTTON (product modal) ─── */
 .btn-edit {

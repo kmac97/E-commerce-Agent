@@ -15,6 +15,10 @@ let _productsData = [];
 let _researchSort = 'date';
 let _productsSort = 'date';
 
+// Score filter state
+let _researchScore7 = false;
+let _productsScore7 = false;
+
 // ─────────────────────────────────────────
 // API
 // ─────────────────────────────────────────
@@ -266,6 +270,20 @@ async function loadDashboard() {
   animateStat("stat-tasks", data.recent_tasks?.length ?? 0);
   animateStat("stat-active", active);
 
+  const statusCounts = {};
+  (data.products || []).forEach(p => {
+    const s = p.status || "idea";
+    statusCounts[s] = (statusCounts[s] || 0) + 1;
+  });
+  const bEl = document.getElementById("status-breakdown");
+  if (bEl) {
+    const order = ["idea", "researching", "testing", "active", "dropped"];
+    bEl.innerHTML = order
+      .filter(s => statusCounts[s])
+      .map(s => `<span class="badge badge-${s}">${statusCounts[s]} ${s}</span>`)
+      .join("") || "";
+  }
+
   const tasksEl = document.getElementById("recent-tasks");
   if (!data.recent_tasks?.length) {
     tasksEl.innerHTML = '<div class="empty">No agent tasks yet. Use /research in Telegram to start.</div>';
@@ -325,6 +343,12 @@ function setResearchSort(key) {
   renderResearch();
 }
 
+function toggleResearchScore7() {
+  _researchScore7 = !_researchScore7;
+  document.getElementById('research-score7')?.classList.toggle('active', _researchScore7);
+  renderResearch();
+}
+
 function renderResearch() {
   const query = (document.getElementById("research-search")?.value || "").toLowerCase();
   const filtered = query
@@ -333,12 +357,17 @@ function renderResearch() {
   const sorted = _researchSort === 'score'
     ? [...filtered].sort((a, b) => (b.score || 0) - (a.score || 0))
     : filtered;
+  const displayed = _researchScore7 ? sorted.filter(r => (r.score || 0) >= 7) : sorted;
   const el = document.getElementById("research-list");
-  if (!sorted.length) {
-    el.innerHTML = `<div class="empty">${query ? "No results." : "No research saved yet."}</div>`;
+  if (!displayed.length) {
+    el.innerHTML = _researchScore7
+      ? `<div class="empty">No research with score 7+ yet.</div>`
+      : query
+        ? `<div class="empty">No results for "${query}".</div>`
+        : `<div class="empty-cta"><div class="empty-cta-icon">🔬</div><div class="empty-cta-text">No research saved yet</div><button class="empty-cta-btn" onclick="showAddResearch()">+ Start Research</button></div>`;
     return;
   }
-  el.innerHTML = sorted.map(r => `
+  el.innerHTML = displayed.map(r => `
     <div class="card" onclick="openResearch('${r.id}')">
       <div class="card-header">
         <div class="card-title">${r.topic}</div>
@@ -376,6 +405,12 @@ function setProductsSort(key) {
   renderProducts();
 }
 
+function toggleProductsScore7() {
+  _productsScore7 = !_productsScore7;
+  document.getElementById('products-score7')?.classList.toggle('active', _productsScore7);
+  renderProducts();
+}
+
 function renderProducts() {
   const query = (document.getElementById("products-search")?.value || "").toLowerCase();
   const filtered = query
@@ -387,12 +422,17 @@ function renderProducts() {
   const sorted = _productsSort === 'score'
     ? [...filtered].sort((a, b) => (b.score || 0) - (a.score || 0))
     : filtered;
+  const displayed = _productsScore7 ? sorted.filter(p => (p.score || 0) >= 7) : sorted;
   const el = document.getElementById("product-list");
-  if (!sorted.length) {
-    el.innerHTML = `<div class="empty">${query ? "No results." : "No products in pipeline yet."}</div>`;
+  if (!displayed.length) {
+    el.innerHTML = _productsScore7
+      ? `<div class="empty">No products with score 7+ yet.</div>`
+      : query
+        ? `<div class="empty">No results for "${query}".</div>`
+        : `<div class="empty-cta"><div class="empty-cta-icon">📦</div><div class="empty-cta-text">No products in pipeline yet</div><button class="empty-cta-btn" onclick="showAddProduct()">+ Add Product</button></div>`;
     return;
   }
-  el.innerHTML = sorted.map(p => `
+  el.innerHTML = displayed.map(p => `
     <div class="card" onclick="openProduct('${p.id}')">
       <div class="card-header">
         <div class="card-title">${p.name}</div>
@@ -434,6 +474,7 @@ async function loadTasks() {
         ${t.duration_seconds ? ` · ${t.duration_seconds}s` : ""}
       </div>
       ${t.error ? `<div class="card-snippet" style="color:#fca5a5">${t.error}</div>` : ""}
+      ${t.status === "running" ? `<div class="task-running-bar"></div>` : ""}
     </div>
   `).join("");
 }
@@ -455,9 +496,19 @@ function openResearch(id) {
     ${r.notes ? `<div class="modal-section-label">Notes</div><p class="modal-body">${r.notes}</p>` : ""}
     <div class="modal-section-label">Research Output</div>
     ${body}
-    <button class="btn-to-pipeline" onclick="researchToPipeline('${id}')">+ Add to Pipeline</button>
+    <div class="modal-actions">
+      <button class="btn-to-pipeline" onclick="researchToPipeline('${id}')">+ Add to Pipeline</button>
+      <button class="btn-copy" onclick="copyResearch('${id}')">⎘ Copy</button>
+    </div>
   `;
   document.getElementById("research-modal").classList.remove("hidden");
+}
+
+function copyResearch(id) {
+  const r = _research[id];
+  if (!r) return;
+  const text = r.data?.raw_output || JSON.stringify(r.data || {}, null, 2);
+  navigator.clipboard.writeText(text).then(() => showToast("Copied to clipboard"));
 }
 
 function researchToPipeline(id) {
@@ -493,7 +544,9 @@ function openProduct(id) {
     ${metaHtml}
     ${p.notes ? `<div class="modal-section-label">Notes</div><p class="modal-body">${p.notes}</p>` : ""}
     ${p.data ? `<div class="modal-section-label">Raw Data</div><pre>${JSON.stringify(p.data, null, 2)}</pre>` : ""}
-    <button class="btn-edit" onclick="editProduct('${id}')">✎ Edit</button>
+    <div class="modal-actions">
+      <button class="btn-edit" onclick="editProduct('${id}')">✎ Edit</button>
+    </div>
   `;
   document.getElementById("research-modal").classList.remove("hidden");
 }
@@ -718,7 +771,10 @@ function appendChatMsg(role, text) {
   const msgs = document.getElementById("chat-messages");
   const div = document.createElement("div");
   div.className = `chat-msg ${role}`;
-  div.innerHTML = `<div class="chat-bubble">${text.replace(/\n/g, "<br>")}</div>`;
+  const content = role === "assistant"
+    ? renderMarkdown(text)
+    : text.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/\n/g,"<br>");
+  div.innerHTML = `<div class="chat-bubble">${content}</div>`;
   msgs.appendChild(div);
   scrollChat();
 }
@@ -781,11 +837,33 @@ document.getElementById("chat-input").addEventListener("keydown", e => {
 });
 
 // ─────────────────────────────────────────
+// KEYBOARD SHORTCUTS
+// ─────────────────────────────────────────
+
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") { closeModal(); closeFormModal(); return; }
+  if (e.key === "/" && !["INPUT","TEXTAREA","SELECT"].includes(document.activeElement.tagName)) {
+    e.preventDefault();
+    const t = document.querySelector(".tab.active")?.dataset.tab;
+    if (t === "research") document.getElementById("research-search")?.focus();
+    else if (t === "products") document.getElementById("products-search")?.focus();
+    else if (t === "max") document.getElementById("chat-input")?.focus();
+  }
+});
+
+// ─────────────────────────────────────────
 // INIT
 // ─────────────────────────────────────────
 
 checkStatus();
 loadDashboard();
+
+// Handle PWA shortcut deep-links (/?tab=research etc)
+const _urlTab = new URLSearchParams(location.search).get("tab");
+if (_urlTab) {
+  const _tabBtn = document.querySelector(`.tab[data-tab="${_urlTab}"]`);
+  if (_tabBtn) _tabBtn.click();
+}
 
 setInterval(() => {
   const activeTab = document.querySelector(".tab.active")?.dataset.tab;
