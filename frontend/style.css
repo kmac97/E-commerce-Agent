@@ -443,25 +443,59 @@ body {
 }
 .modal-close:hover { color: var(--text); border-color: rgba(255,255,255,0.2); }
 #modal-content h2 {
-  font-size: 17px;
-  font-weight: 700;
+  font-size: 22px;
+  font-weight: 800;
   margin-bottom: 14px;
-  letter-spacing: -0.025em;
+  letter-spacing: -0.035em;
   padding-right: 36px;
   color: var(--text);
+  line-height: 1.2;
 }
-#modal-content p { font-size: 14px; color: var(--muted2); line-height: 1.6; }
+.modal-badges { display: flex; align-items: center; gap: 8px; margin-bottom: 18px; }
+.modal-section-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  margin-top: 20px;
+  margin-bottom: 8px;
+}
+.modal-body {
+  font-size: 14.5px;
+  color: var(--muted2);
+  line-height: 1.7;
+}
+.modal-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+.modal-meta-item { display: flex; flex-direction: column; gap: 3px; }
+.modal-meta-key {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.modal-meta-val {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
 #modal-content pre {
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 14px 16px;
-  font-size: 12.5px;
+  font-size: 12px;
   overflow-x: auto;
-  margin-top: 14px;
+  margin-top: 6px;
   white-space: pre-wrap;
   color: var(--muted2);
-  line-height: 1.65;
+  line-height: 1.7;
   font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
 }
 

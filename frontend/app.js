@@ -351,7 +351,9 @@ function openResearch(id) {
   const rawOutput = r.data?.raw_output || JSON.stringify(r.data || {}, null, 2);
   document.getElementById("modal-content").innerHTML = `
     <h2>${r.topic}</h2>
-    <p style="margin-bottom:10px">${badge(r.type, r.type)} ${r.score ? scoreEl(r.score) : ""}</p>
+    <div class="modal-badges">${badge(r.type, r.type)} ${r.score ? scoreEl(r.score) : ""}</div>
+    ${r.notes ? `<div class="modal-section-label">Notes</div><p class="modal-body">${r.notes}</p>` : ""}
+    <div class="modal-section-label">Research Output</div>
     <pre>${rawOutput}</pre>
   `;
   document.getElementById("research-modal").classList.remove("hidden");
@@ -360,18 +362,29 @@ function openResearch(id) {
 function openProduct(id) {
   const p = _products[id];
   if (!p) return;
-  const meta = [
-    p.niche ? `Niche: ${p.niche}` : null,
-    p.cost_estimate != null ? `Cost: $${p.cost_estimate}` : null,
-    p.sell_price_estimate != null ? `Sell price: $${p.sell_price_estimate}` : null,
-    p.margin_estimate != null ? `Margin: ${p.margin_estimate}%` : null,
-  ].filter(Boolean).join(" · ");
+  const metaItems = [
+    p.niche            ? { key: "Niche",       val: p.niche }                      : null,
+    p.cost_estimate    != null ? { key: "Cost",        val: `$${p.cost_estimate}` }        : null,
+    p.sell_price_estimate != null ? { key: "Sell Price", val: `$${p.sell_price_estimate}` } : null,
+    p.margin_estimate  != null ? { key: "Est. Margin", val: `${p.margin_estimate}%` }      : null,
+  ].filter(Boolean);
+  const metaHtml = metaItems.length ? `
+    <div class="modal-section-label">Details</div>
+    <div class="modal-meta">
+      ${metaItems.map(m => `
+        <div class="modal-meta-item">
+          <span class="modal-meta-key">${m.key}</span>
+          <span class="modal-meta-val">${m.val}</span>
+        </div>
+      `).join("")}
+    </div>
+  ` : "";
   document.getElementById("modal-content").innerHTML = `
     <h2>${p.name}</h2>
-    <p style="margin-bottom:10px">${badge(p.status || "idea", p.status || "idea")} ${p.score ? scoreEl(p.score) : ""}</p>
-    ${meta ? `<p style="margin-bottom:10px;font-size:13px;color:var(--muted2)">${meta}</p>` : ""}
-    ${p.notes ? `<p>${p.notes}</p>` : ""}
-    ${p.data ? `<pre>${JSON.stringify(p.data, null, 2)}</pre>` : ""}
+    <div class="modal-badges">${badge(p.status || "idea", p.status || "idea")} ${p.score ? scoreEl(p.score) : ""}</div>
+    ${metaHtml}
+    ${p.notes ? `<div class="modal-section-label">Notes</div><p class="modal-body">${p.notes}</p>` : ""}
+    ${p.data ? `<div class="modal-section-label">Raw Data</div><pre>${JSON.stringify(p.data, null, 2)}</pre>` : ""}
   `;
   document.getElementById("research-modal").classList.remove("hidden");
 }
