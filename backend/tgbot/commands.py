@@ -1,4 +1,4 @@
-# telegram/commands.py
+# tgbot/commands.py
 # Handles all Telegram bot commands and messages.
 
 import logging
@@ -7,6 +7,31 @@ from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
 
 logger = logging.getLogger(__name__)
+
+# In-memory conversation history (per chat session)
+_conversation_history: dict[int, list] = {}
+
+SYSTEM_PROMPT = """You are Max — a sharp, experienced e-commerce business partner and operator.
+You're not a chatbot or assistant. You're a co-founder who has built and scaled multiple Shopify stores.
+You speak directly, confidently, and practically. No fluff, no corporate speak.
+
+Your personality:
+- Straight-talking but friendly — like a business partner texting you
+- You know your stuff: product research, dropshipping, paid ads, Shopify, margins, ROAS
+- You give real opinions. If an idea is bad, say so and why. If it's good, get excited about it
+- You use casual language, short sentences, occasional humour
+- You remember context from earlier in the conversation
+- You never say "As an AI" or "I'm just a bot" — you're Max, a business partner
+
+Your capabilities (what you can actually do):
+- Research products and niches using real web data
+- Create and manage Shopify product listings
+- Monitor orders and store performance
+- Eventually: run ads, handle emails, manage reviews
+
+When someone asks you to research something, confirm and kick it off.
+When someone's just chatting or asking for advice, respond naturally as Max.
+Keep responses concise — this is Telegram, not an essay."""
 
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -204,41 +229,86 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
-    Handle plain text messages.
-    Only triggers research if the message looks like a product/niche query.
-    Otherwise responds with help text.
+    Handle plain text messages with personality and memory.
+    Uses GPT-4o-mini directly for natural conversation.
+    Detects research intent and kicks off agent tasks automatically.
     """
-    text = update.message.text.strip().lower()
+    import httpx
+    import uuid
+    import asyncio
+    import config as cfg
 
-    # Keywords that suggest a research request
+    chat_id = update.effective_chat.id
+    text = update.message.text.strip()
+
+    # Initialise conversation history for this chat
+    if chat_id not in _conversation_history:
+        _conversation_history[chat_id] = []
+
+    # Add user message to history
+    _conversation_history[chat_id].append({"role": "user", "content": text})
+
+    # Keep last 20 messages to avoid token overflow
+    history = _conversation_history[chat_id][-20:]
+
+    # Build messages for the LLM
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}] + history
+
+    # Call OpenRouter directly (faster than CrewAI for chat)
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            res = await client.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {cfg.OPENROUTER_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": cfg.OPENROUTER_MODEL,
+                    "messages": messages,
+                    "max_tokens": 500,
+                    "temperature": 0.85,
+                },
+            )
+            data = res.json()
+            reply = data["choices"][0]["message"]["content"].strip()
+    except Exception as e:
+        logger.error(f"Chat LLM error: {e}")
+        reply = "Something went wrong on my end — try again in a sec."
+
+    # Save assistant reply to history
+    _conversation_history[chat_id].append({"role": "assistant", "content": reply})
+
+    # Detect if Max decided to kick off research
     research_triggers = [
-        "research", "find", "look up", "analyse", "analyze", "niche",
-        "product", "sell", "dropship", "trending", "winning", "competitor",
-        "how is", "what about", "tell me about",
+        "researching", "looking into", "on it", "let me research",
+        "i'll check", "checking", "running research", "looking that up",
     ]
+    lower_reply = reply.lower()
+    should_research = any(t in lower_reply for t in research_triggers)
 
-    is_research = any(trigger in text for trigger in research_triggers)
+    # Also detect explicit research intent in user message
+    user_triggers = ["research ", "look up ", "find me ", "analyse ", "analyze "]
+    if any(text.lower().startswith(t) for t in user_triggers):
+        should_research = True
 
-    if is_research:
-        await update.message.reply_text(
-            f"🔍 Researching: *{update.message.text[:100]}*\n\nI'll notify you when done.",
-            parse_mode=ParseMode.MARKDOWN,
-        )
-        import uuid
-        from agents.crew import run_research_task
-        import asyncio
+    await update.message.reply_text(reply)
+
+    # Kick off research task if needed
+    if should_research:
+        topic = text
+        for prefix in ["research ", "look up ", "find me ", "analyse ", "analyze "]:
+            if topic.lower().startswith(prefix):
+                topic = topic[len(prefix):]
+                break
+
         task_id = str(uuid.uuid4())
         asyncio.create_task(
-            run_research_task(task_id=task_id, topic=update.message.text, research_type="product")
+            run_research_task_from_chat(task_id=task_id, topic=topic, chat_id=chat_id)
         )
-    else:
-        await update.message.reply_text(
-            "Here's what I can do:\n\n"
-            "/research [product] — Research a product\n"
-            "/store — View Shopify listings\n"
-            "/orders — Check orders\n"
-            "/products — Product pipeline\n"
-            "/tasks — Recent agent activity\n"
-            "/status — System health\n\n"
-            "Or type: research posture correctors",
-        )
+
+
+async def run_research_task_from_chat(task_id: str, topic: str, chat_id: int):
+    """Wrapper to run research and send result back to the right chat."""
+    from agents.crew import run_research_task
+    await run_research_task(task_id=task_id, topic=topic, research_type="product")
