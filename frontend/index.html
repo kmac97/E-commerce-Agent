@@ -91,7 +91,11 @@
     <section id="tab-research" class="tab-content">
       <div class="section-title">
         Saved Research
-        <button class="add-btn" onclick="showAddResearch()">+ Research</button>
+        <div class="sort-group">
+          <button class="sort-btn active" id="research-sort-date" onclick="setResearchSort('date')">Date</button>
+          <button class="sort-btn" id="research-sort-score" onclick="setResearchSort('score')">Score</button>
+          <button class="add-btn" onclick="showAddResearch()">+ Research</button>
+        </div>
       </div>
 
       <div class="search-row">
@@ -114,7 +118,11 @@
     <section id="tab-products" class="tab-content">
       <div class="section-title">
         Product Pipeline
-        <button class="add-btn" onclick="showAddProduct()">+ Product</button>
+        <div class="sort-group">
+          <button class="sort-btn active" id="products-sort-date" onclick="setProductsSort('date')">Date</button>
+          <button class="sort-btn" id="products-sort-score" onclick="setProductsSort('score')">Score</button>
+          <button class="add-btn" onclick="showAddProduct()">+ Product</button>
+        </div>
       </div>
 
       <div class="search-row">
@@ -183,5 +191,10 @@
   </div>
 
   <script src="app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js');
+    }
+  </script>
 </body>
 </html>

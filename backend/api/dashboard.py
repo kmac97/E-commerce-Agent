@@ -19,6 +19,16 @@ class StatusUpdate(BaseModel):
     status: str
 
 
+class ProductUpdate(BaseModel):
+    name: Optional[str] = None
+    niche: Optional[str] = None
+    score: Optional[int] = None
+    notes: Optional[str] = None
+    cost_estimate: Optional[float] = None
+    sell_price_estimate: Optional[float] = None
+    margin_estimate: Optional[float] = None
+
+
 @router.get("/summary")
 async def get_dashboard_summary():
     """
@@ -71,6 +81,16 @@ async def create_product(product: ProductCreate):
         notes=product.notes,
     )
     return result
+
+
+@router.patch("/products/{product_id}")
+async def update_product_endpoint(product_id: str, body: ProductUpdate):
+    """Update product fields (name, niche, score, notes, cost/price estimates)."""
+    from database.client import update_product_fields
+    fields = {k: v for k, v in body.dict().items() if v is not None}
+    if fields:
+        await update_product_fields(product_id, fields)
+    return {"status": "updated"}
 
 
 @router.patch("/products/{product_id}/status")

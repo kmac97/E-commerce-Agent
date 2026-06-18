@@ -632,8 +632,50 @@ body {
   letter-spacing: 0;
   text-transform: none;
   margin-left: auto;
+  flex-shrink: 0;
 }
 .add-btn:hover { background: rgba(99,102,241,0.15); border-color: rgba(99,102,241,0.35); }
+
+/* ─── SORT GROUP ─── */
+.sort-group { margin-left: auto; display: flex; align-items: center; gap: 4px; }
+.sort-group .add-btn { margin-left: 4px; }
+.sort-btn {
+  font-size: 10.5px;
+  font-weight: 600;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  padding: 3px 8px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-family: var(--font);
+  transition: all 0.15s;
+  text-transform: none;
+  letter-spacing: 0;
+  flex-shrink: 0;
+}
+.sort-btn.active { background: rgba(99,102,241,0.1); color: var(--accent2); border-color: rgba(99,102,241,0.25); }
+.sort-btn:hover:not(.active) { color: var(--text); border-color: rgba(255,255,255,0.14); }
+
+/* ─── EDIT BUTTON (product modal) ─── */
+.btn-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--muted2);
+  padding: 9px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: var(--font);
+  transition: all 0.15s;
+  margin-top: 14px;
+  margin-right: 8px;
+}
+.btn-edit:hover { border-color: rgba(255,255,255,0.2); color: var(--text); }
 
 /* ─── TOAST ─── */
 .toast {

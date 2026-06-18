@@ -11,6 +11,10 @@ const _chatHistory = [];
 let _researchData = [];
 let _productsData = [];
 
+// Sort state
+let _researchSort = 'date';
+let _productsSort = 'date';
+
 // ─────────────────────────────────────────
 // API
 // ─────────────────────────────────────────
@@ -108,6 +112,10 @@ function scoreEl(score) {
 
 function deleteBtn(onclick) {
   return `<button class="btn-delete" onclick="event.stopPropagation();${onclick}" title="Delete">×</button>`;
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
 function inlineMd(text) {
@@ -310,17 +318,27 @@ async function loadResearch(type = "") {
   renderResearch();
 }
 
+function setResearchSort(key) {
+  _researchSort = key;
+  document.querySelectorAll('[id^="research-sort-"]').forEach(b => b.classList.remove('active'));
+  document.getElementById(`research-sort-${key}`)?.classList.add('active');
+  renderResearch();
+}
+
 function renderResearch() {
   const query = (document.getElementById("research-search")?.value || "").toLowerCase();
   const filtered = query
     ? _researchData.filter(r => (r.topic || "").toLowerCase().includes(query) || (r.notes || "").toLowerCase().includes(query))
     : _researchData;
+  const sorted = _researchSort === 'score'
+    ? [...filtered].sort((a, b) => (b.score || 0) - (a.score || 0))
+    : filtered;
   const el = document.getElementById("research-list");
-  if (!filtered.length) {
+  if (!sorted.length) {
     el.innerHTML = `<div class="empty">${query ? "No results." : "No research saved yet."}</div>`;
     return;
   }
-  el.innerHTML = filtered.map(r => `
+  el.innerHTML = sorted.map(r => `
     <div class="card" onclick="openResearch('${r.id}')">
       <div class="card-header">
         <div class="card-title">${r.topic}</div>
@@ -351,6 +369,13 @@ async function loadProducts(status = "") {
   renderProducts();
 }
 
+function setProductsSort(key) {
+  _productsSort = key;
+  document.querySelectorAll('[id^="products-sort-"]').forEach(b => b.classList.remove('active'));
+  document.getElementById(`products-sort-${key}`)?.classList.add('active');
+  renderProducts();
+}
+
 function renderProducts() {
   const query = (document.getElementById("products-search")?.value || "").toLowerCase();
   const filtered = query
@@ -359,12 +384,15 @@ function renderProducts() {
         (p.niche || "").toLowerCase().includes(query) ||
         (p.notes || "").toLowerCase().includes(query))
     : _productsData;
+  const sorted = _productsSort === 'score'
+    ? [...filtered].sort((a, b) => (b.score || 0) - (a.score || 0))
+    : filtered;
   const el = document.getElementById("product-list");
-  if (!filtered.length) {
+  if (!sorted.length) {
     el.innerHTML = `<div class="empty">${query ? "No results." : "No products in pipeline yet."}</div>`;
     return;
   }
-  el.innerHTML = filtered.map(p => `
+  el.innerHTML = sorted.map(p => `
     <div class="card" onclick="openProduct('${p.id}')">
       <div class="card-header">
         <div class="card-title">${p.name}</div>
@@ -465,8 +493,68 @@ function openProduct(id) {
     ${metaHtml}
     ${p.notes ? `<div class="modal-section-label">Notes</div><p class="modal-body">${p.notes}</p>` : ""}
     ${p.data ? `<div class="modal-section-label">Raw Data</div><pre>${JSON.stringify(p.data, null, 2)}</pre>` : ""}
+    <button class="btn-edit" onclick="editProduct('${id}')">✎ Edit</button>
   `;
   document.getElementById("research-modal").classList.remove("hidden");
+}
+
+function editProduct(id) {
+  const p = _products[id];
+  if (!p) return;
+  document.getElementById("modal-content").innerHTML = `
+    <h2 style="margin-bottom:18px;font-size:17px;font-weight:700;letter-spacing:-0.02em">Edit Product</h2>
+    <div class="form-group">
+      <label class="form-label">Name *</label>
+      <input class="form-input" id="ep-name" value="${escHtml(p.name || '')}" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">Niche</label>
+      <input class="form-input" id="ep-niche" value="${escHtml(p.niche || '')}" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">Score (1–10)</label>
+      <input class="form-input" id="ep-score" type="number" min="1" max="10" value="${p.score || ''}" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">Est. Cost ($)</label>
+      <input class="form-input" id="ep-cost" type="number" step="0.01" value="${p.cost_estimate || ''}" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">Est. Sell Price ($)</label>
+      <input class="form-input" id="ep-sell" type="number" step="0.01" value="${p.sell_price_estimate || ''}" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">Notes</label>
+      <textarea class="form-input" id="ep-notes" rows="3">${escHtml(p.notes || '')}</textarea>
+    </div>
+    <button class="form-submit" onclick="saveProductEdit('${id}')">Save Changes</button>
+  `;
+  setTimeout(() => document.getElementById("ep-name")?.focus(), 60);
+}
+
+async function saveProductEdit(id) {
+  const name = document.getElementById("ep-name").value.trim();
+  if (!name) { showToast("Name is required", null, "error"); return; }
+  const btn = document.querySelector("#modal-content .form-submit");
+  btn.disabled = true; btn.textContent = "Saving...";
+  const fields = {
+    name,
+    niche: document.getElementById("ep-niche").value.trim() || null,
+    score: parseInt(document.getElementById("ep-score").value) || null,
+    cost_estimate: parseFloat(document.getElementById("ep-cost").value) || null,
+    sell_price_estimate: parseFloat(document.getElementById("ep-sell").value) || null,
+    notes: document.getElementById("ep-notes").value.trim() || null,
+  };
+  const res = await apiFetch(`/api/dashboard/products/${id}`, "PATCH", fields);
+  if (res) {
+    Object.assign(_products[id], fields);
+    closeModal();
+    showToast("Product updated");
+    loadProducts();
+  } else {
+    btn.disabled = false; btn.textContent = "Save Changes";
+    showToast("Update failed", null, "error");
+  }
 }
 
 function closeModal() {
