@@ -251,8 +251,47 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Keep last 20 messages to avoid token overflow
     history = _conversation_history[chat_id][-20:]
 
+    # Detect if the question needs real-time data
+    realtime_triggers = [
+        "trend", "trending", "selling", "sell now", "hot right now", "what's hot",
+        "right now", "currently", "today", "this week", "this month", "2024", "2025", "2026",
+        "winning product", "best product", "top product", "what should i", "niche",
+        "market", "demand", "popular", "viral", "tiktok", "ads", "opportunity",
+    ]
+    needs_realtime = any(t in text.lower() for t in realtime_triggers)
+
+    # If real-time data needed, do a quick Tavily search and inject results
+    live_context = ""
+    if needs_realtime and cfg.TAVILY_API_KEY:
+        try:
+            async with httpx.AsyncClient(timeout=15) as client:
+                tavily_res = await client.post(
+                    "https://api.tavily.com/search",
+                    json={
+                        "api_key": cfg.TAVILY_API_KEY,
+                        "query": text,
+                        "search_depth": "basic",
+                        "max_results": 4,
+                        "include_answer": True,
+                    },
+                )
+                tavily_data = tavily_res.json()
+                snippets = []
+                if tavily_data.get("answer"):
+                    snippets.append(tavily_data["answer"])
+                for r in tavily_data.get("results", [])[:3]:
+                    snippets.append(f"- {r.get('title', '')}: {r.get('content', '')[:200]}")
+                if snippets:
+                    live_context = "LIVE WEB DATA (use this to answer, today's date is 2026):\n" + "\n".join(snippets)
+        except Exception as e:
+            logger.warning(f"Tavily quick search failed: {e}")
+
     # Build messages for the LLM
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}] + history
+    system = SYSTEM_PROMPT
+    if live_context:
+        system = SYSTEM_PROMPT + f"\n\n{live_context}"
+
+    messages = [{"role": "system", "content": system}] + history
 
     # Call OpenRouter directly (faster than CrewAI for chat)
     try:
