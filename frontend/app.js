@@ -292,8 +292,11 @@ async function deleteResearch(id, el) {
   setTimeout(async () => {
     if (cancelled) return;
     const res = await apiFetch(`/api/research/${id}`, "DELETE");
-    if (res !== null) card.remove();
-    else { card.classList.remove("card-fading"); showToast("Delete failed", null, "error"); }
+    if (res !== null) {
+      card.remove();
+      delete _research[id];
+      _researchData = _researchData.filter(r => r.id !== id);
+    } else { card.classList.remove("card-fading"); showToast("Delete failed", null, "error"); }
   }, 4000);
 }
 
@@ -305,8 +308,11 @@ async function deleteProduct(id, el) {
   setTimeout(async () => {
     if (cancelled) return;
     const res = await apiFetch(`/api/dashboard/products/${id}`, "DELETE");
-    if (res !== null) card.remove();
-    else { card.classList.remove("card-fading"); showToast("Delete failed", null, "error"); }
+    if (res !== null) {
+      card.remove();
+      delete _products[id];
+      _productsData = _productsData.filter(p => p.id !== id);
+    } else { card.classList.remove("card-fading"); showToast("Delete failed", null, "error"); }
   }, 4000);
 }
 
@@ -1009,6 +1015,10 @@ function calcProfit() {
 
   const fee = feePct / 100;
   const margin = marginPct / 100;
+  if (fee + margin >= 1) {
+    el.innerHTML = '<div class="calc-hint" style="color:var(--red)">Fee + margin must be less than 100% — reduce your targets.</div>';
+    return;
+  }
   const sell = totalCost / (1 - fee - margin);
   const profit = sell * (1 - fee) - totalCost;
   const roi = (profit / totalCost) * 100;
@@ -1057,9 +1067,9 @@ async function submitImportURL() {
   const btn = document.querySelector("#form-content .form-submit");
   btn.disabled = true; btn.textContent = "Fetching…";
   const res = await apiFetch("/api/agents/import-product", "POST", { url });
-  if (res?.error) {
+  if (!res || res.error) {
     btn.disabled = false; btn.textContent = "Import Product";
-    showToast(res.error, null, "error"); return;
+    showToast(res?.error || "Could not reach server", null, "error"); return;
   }
   closeFormModal();
   showAddProduct({ name: res.name, niche: res.niche, score: res.score, notes: res.notes });

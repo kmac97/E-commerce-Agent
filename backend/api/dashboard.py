@@ -87,7 +87,7 @@ async def create_product(product: ProductCreate):
 async def update_product_endpoint(product_id: str, body: ProductUpdate):
     """Update product fields (name, niche, score, notes, cost/price estimates)."""
     from database.client import update_product_fields
-    fields = {k: v for k, v in body.dict().items() if v is not None}
+    fields = body.dict(exclude_unset=True)
     if fields:
         await update_product_fields(product_id, fields)
     return {"status": "updated"}
