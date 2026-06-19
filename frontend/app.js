@@ -406,9 +406,11 @@ async function loadBriefing() {
 // DASHBOARD TAB
 // ─────────────────────────────────────────
 
-async function loadDashboard() {
-  loadBriefing();   // non-blocking
-  loadRevenue();    // non-blocking
+async function loadDashboard(full = true) {
+  if (full) {
+    loadBriefing();  // AI call — skip on 30s polls
+    loadRevenue();   // Shopify API — skip on 30s polls
+  }
   const data = await apiFetch("/api/dashboard/summary");
   if (!data) {
     document.getElementById("recent-tasks").innerHTML = '<div class="empty">Could not reach server.</div>';
@@ -613,7 +615,7 @@ async function handleKanbanDrop(e, newStatus) {
   e.preventDefault();
   e.currentTarget.classList.remove("drag-over");
   const id = _dragProductId; _dragProductId = null;
-  if (!id || _products[id]?.status === newStatus) return;
+  if (!id || (_products[id]?.status || "idea") === newStatus) return;
   _productsData = _productsData.map(p => p.id === id ? { ...p, status: newStatus } : p);
   _products[id] = { ..._products[id], status: newStatus };
   renderKanban();
@@ -984,7 +986,7 @@ function pollTask(taskId, label) {
       setTabBadge("tasks");
       const activeTab = document.querySelector(".tab.active")?.dataset.tab;
       if (activeTab === "research") loadResearch(currentResearchFilter);
-      if (activeTab === "dashboard") loadDashboard();
+      if (activeTab === "dashboard") loadDashboard(false);
       if (activeTab === "tasks") loadTasks();
     } else if (task.status === "failed") {
       clearInterval(interval);
@@ -1306,7 +1308,7 @@ if (_urlTab) {
 
 setInterval(() => {
   const activeTab = document.querySelector(".tab.active")?.dataset.tab;
-  if (activeTab === "dashboard") loadDashboard();
+  if (activeTab === "dashboard") loadDashboard(false);
   if (activeTab === "tasks") loadTasks();
   checkStatus();
   updateTabMetas();
