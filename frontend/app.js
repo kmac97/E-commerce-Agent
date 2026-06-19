@@ -19,6 +19,9 @@ let _productsSort = 'date';
 let _researchScore7 = false;
 let _productsScore7 = false;
 
+// Last loaded timestamps per tab
+const _lastLoaded = {};
+
 // ─────────────────────────────────────────
 // API
 // ─────────────────────────────────────────
@@ -50,6 +53,11 @@ async function checkStatus() {
   if (data && data.status === "ok") {
     dot.className = "status-dot online";
     if (label) label.textContent = "Live";
+    const tgBtn = document.getElementById("tg-btn");
+    if (tgBtn && data.telegram_bot) {
+      tgBtn.href = `https://t.me/${data.telegram_bot}`;
+      tgBtn.classList.remove("hidden");
+    }
   } else {
     dot.className = "status-dot offline";
     if (label) label.textContent = "Offline";
@@ -102,6 +110,30 @@ function timeAgo(dateStr) {
   const hrs = Math.floor(mins / 60);
   if (hrs < 24) return `${hrs}h ago`;
   return `${Math.floor(hrs / 24)}d ago`;
+}
+
+function setTabMeta(tabId, refreshCall) {
+  _lastLoaded[tabId] = Date.now();
+  const el = document.getElementById(`meta-${tabId}`);
+  if (!el) return;
+  el.innerHTML = `<span>Updated just now</span><button class="tab-meta-refresh" onclick="${refreshCall}" title="Refresh">↻</button>`;
+}
+
+function updateTabMetas() {
+  const now = Date.now();
+  const refreshCalls = {
+    research: "loadResearch(currentResearchFilter)",
+    products: "loadProducts()",
+    tasks: "loadTasks()",
+  };
+  for (const [tabId, ts] of Object.entries(_lastLoaded)) {
+    const el = document.getElementById(`meta-${tabId}`);
+    const refreshCall = refreshCalls[tabId];
+    if (!el || !refreshCall) continue;
+    const mins = Math.floor((now - ts) / 60000);
+    const label = mins < 1 ? "just now" : mins === 1 ? "1m ago" : `${mins}m ago`;
+    el.innerHTML = `<span>Updated ${label}</span><button class="tab-meta-refresh" onclick="${refreshCall}" title="Refresh">↻</button>`;
+  }
 }
 
 function badge(type, text) {
@@ -334,6 +366,7 @@ async function loadResearch(type = "") {
   _researchData = data;
   data.forEach(r => _research[r.id] = r);
   renderResearch();
+  setTabMeta("research", "loadResearch(currentResearchFilter)");
 }
 
 function setResearchSort(key) {
@@ -396,6 +429,7 @@ async function loadProducts(status = "") {
   _productsData = data;
   data.forEach(p => _products[p.id] = p);
   renderProducts();
+  setTabMeta("products", "loadProducts()");
 }
 
 function setProductsSort(key) {
@@ -477,6 +511,7 @@ async function loadTasks() {
       ${t.status === "running" ? `<div class="task-running-bar"></div>` : ""}
     </div>
   `).join("");
+  setTabMeta("tasks", "loadTasks()");
 }
 
 // ─────────────────────────────────────────
@@ -502,6 +537,34 @@ function openResearch(id) {
     </div>
   `;
   document.getElementById("research-modal").classList.remove("hidden");
+}
+
+function downloadCSV(filename, rows) {
+  const csv = rows.map(r => r.map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+  a.download = filename;
+  a.click();
+}
+
+function exportResearchCSV() {
+  if (!_researchData.length) { showToast("No research to export", null, "error"); return; }
+  const headers = ["Topic", "Type", "Score", "Notes", "Created"];
+  const rows = _researchData.map(r => [r.topic, r.type, r.score ?? "", r.notes ?? "", r.created_at?.slice(0,10) ?? ""]);
+  downloadCSV("research.csv", [headers, ...rows]);
+  showToast("Exported research.csv");
+}
+
+function exportProductsCSV() {
+  if (!_productsData.length) { showToast("No products to export", null, "error"); return; }
+  const headers = ["Name", "Status", "Score", "Niche", "Cost", "Sell Price", "Margin %", "Notes", "Created"];
+  const rows = _productsData.map(p => [
+    p.name, p.status ?? "idea", p.score ?? "", p.niche ?? "",
+    p.cost_estimate ?? "", p.sell_price_estimate ?? "", p.margin_estimate ?? "",
+    p.notes ?? "", p.created_at?.slice(0,10) ?? ""
+  ]);
+  downloadCSV("products.csv", [headers, ...rows]);
+  showToast("Exported products.csv");
 }
 
 function copyResearch(id) {
@@ -735,6 +798,13 @@ document.getElementById("form-modal").addEventListener("click", function(e) {
 // MAX CHAT
 // ─────────────────────────────────────────
 
+function sendPrompt(text) {
+  const input = document.getElementById("chat-input");
+  if (!input) return;
+  input.value = text;
+  sendChat();
+}
+
 async function sendChat() {
   const input = document.getElementById("chat-input");
   const sendBtn = document.querySelector(".chat-send");
@@ -836,6 +906,14 @@ document.getElementById("chat-input").addEventListener("keydown", e => {
   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChat(); }
 });
 
+// Stat card click-through
+document.querySelectorAll(".stat-card[data-tab]").forEach(card => {
+  card.addEventListener("click", () => {
+    const tabBtn = document.querySelector(`.tab[data-tab="${card.dataset.tab}"]`);
+    if (tabBtn) tabBtn.click();
+  });
+});
+
 // ─────────────────────────────────────────
 // KEYBOARD SHORTCUTS
 // ─────────────────────────────────────────
@@ -870,4 +948,5 @@ setInterval(() => {
   if (activeTab === "dashboard") loadDashboard();
   if (activeTab === "tasks") loadTasks();
   checkStatus();
+  updateTabMetas();
 }, 30000);

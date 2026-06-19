@@ -108,7 +108,10 @@ async def root():
 
 @app.get("/health")
 async def health():
-    return {"status": "ok"}
+    return {
+        "status": "ok",
+        "telegram_bot": config.TELEGRAM_BOT_USERNAME or None,
+    }
 
 
 # ─────────────────────────────────────────

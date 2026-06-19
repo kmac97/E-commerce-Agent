@@ -30,6 +30,7 @@ TEMPERATURE = 0.7
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+TELEGRAM_BOT_USERNAME = os.getenv("TELEGRAM_BOT_USERNAME")  # e.g. myagent_bot
 
 # ─────────────────────────────────────────
 # SUPABASE

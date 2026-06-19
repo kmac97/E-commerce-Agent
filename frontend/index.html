@@ -17,9 +17,12 @@
         <span class="logo-mark">⚡</span>
         Agent<span class="logo-sub"> · E-commerce</span>
       </span>
-      <div class="status-chip">
-        <span class="status-label" id="status-label">Connecting</span>
-        <span id="status-dot" class="status-dot"></span>
+      <div style="display:flex;align-items:center;gap:8px">
+        <a id="tg-btn" class="tg-btn hidden" href="#" target="_blank" rel="noopener">✈ Bot</a>
+        <div class="status-chip">
+          <span class="status-label" id="status-label">Connecting</span>
+          <span id="status-dot" class="status-dot"></span>
+        </div>
       </div>
     </div>
   </header>
@@ -55,22 +58,22 @@
       <div class="section-title">Overview</div>
       <div id="status-breakdown" class="status-breakdown"></div>
       <div class="stats-grid">
-        <div class="stat-card">
+        <div class="stat-card" data-tab="products">
           <div class="stat-icon">📦</div>
           <div class="stat-value" id="stat-products">—</div>
           <div class="stat-label">Products</div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card" data-tab="research">
           <div class="stat-icon">🔬</div>
           <div class="stat-value" id="stat-research">—</div>
           <div class="stat-label">Research</div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card" data-tab="tasks">
           <div class="stat-icon">⚡</div>
           <div class="stat-value" id="stat-tasks">—</div>
           <div class="stat-label">Tasks Run</div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card" data-tab="tasks">
           <div class="stat-icon">◉</div>
           <div class="stat-value" id="stat-active">—</div>
           <div class="stat-label">Active</div>
@@ -95,6 +98,7 @@
         <div class="sort-group">
           <button class="sort-btn active" id="research-sort-date" onclick="setResearchSort('date')">Date</button>
           <button class="sort-btn" id="research-sort-score" onclick="setResearchSort('score')">Score</button>
+          <button class="export-btn" onclick="exportResearchCSV()" title="Export CSV">⬇ CSV</button>
           <button class="add-btn" onclick="showAddResearch()">+ Research</button>
         </div>
       </div>
@@ -111,6 +115,7 @@
         <button class="filter-btn filter-score7" id="research-score7" onclick="toggleResearchScore7()">★ 7+</button>
       </div>
 
+      <div class="tab-meta" id="meta-research"></div>
       <div id="research-list" class="card-list">
         <div class="loading">Loading</div>
       </div>
@@ -123,6 +128,7 @@
         <div class="sort-group">
           <button class="sort-btn active" id="products-sort-date" onclick="setProductsSort('date')">Date</button>
           <button class="sort-btn" id="products-sort-score" onclick="setProductsSort('score')">Score</button>
+          <button class="export-btn" onclick="exportProductsCSV()" title="Export CSV">⬇ CSV</button>
           <button class="add-btn" onclick="showAddProduct()">+ Product</button>
         </div>
       </div>
@@ -140,6 +146,7 @@
         <button class="filter-btn filter-score7" id="products-score7" onclick="toggleProductsScore7()">★ 7+</button>
       </div>
 
+      <div class="tab-meta" id="meta-products"></div>
       <div id="product-list" class="card-list">
         <div class="loading">Loading</div>
       </div>
@@ -148,6 +155,7 @@
     <!-- TASKS TAB -->
     <section id="tab-tasks" class="tab-content">
       <div class="section-title">Agent Task History</div>
+      <div class="tab-meta" id="meta-tasks"></div>
       <div id="task-list" class="card-list">
         <div class="loading">Loading</div>
       </div>
@@ -162,6 +170,13 @@
             <div class="chat-name">Max</div>
             <div class="chat-sub">Your e-commerce co-founder</div>
           </div>
+        </div>
+        <div class="prompt-chips">
+          <button class="prompt-chip" onclick="sendPrompt('What e-commerce niches are trending right now?')">What's trending?</button>
+          <button class="prompt-chip" onclick="sendPrompt('Look at my product pipeline and tell me which to prioritise and why')">Score my pipeline</button>
+          <button class="prompt-chip" onclick="sendPrompt('Give me 3 specific product ideas I could start selling this week')">3 product ideas</button>
+          <button class="prompt-chip" onclick="sendPrompt('What should I focus on today to grow my e-commerce business?')">What to focus on?</button>
+          <button class="prompt-chip" onclick="sendPrompt('What are the biggest mistakes new dropshippers make?')">Common mistakes</button>
         </div>
         <div id="chat-messages" class="chat-messages">
           <div class="chat-msg assistant">
