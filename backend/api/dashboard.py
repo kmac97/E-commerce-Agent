@@ -37,25 +37,38 @@ async def get_dashboard_summary():
     """
     from database.client import supabase
 
-    # Recent research
+    # Recent research (display only, keep small)
     research = supabase.table("research").select("*").order(
         "created_at", desc=True
     ).limit(5).execute()
 
-    # Recent agent tasks
+    # Recent agent tasks (display only)
     tasks = supabase.table("agent_tasks").select("*").order(
         "created_at", desc=True
     ).limit(10).execute()
 
-    # Product pipeline
+    # Products — fetch up to 200 so status breakdown and stat count are accurate
     products = supabase.table("products").select("*").order(
         "created_at", desc=True
-    ).limit(10).execute()
+    ).limit(200).execute()
+
+    # Total counts for accurate dashboard stats
+    try:
+        research_count = supabase.table("research").select("id", count="exact").execute()
+        tasks_count = supabase.table("agent_tasks").select("id", count="exact").execute()
+        total_research = research_count.count or len(research.data)
+        total_tasks = tasks_count.count or len(tasks.data)
+    except Exception:
+        total_research = len(research.data)
+        total_tasks = len(tasks.data)
 
     return {
         "recent_research": research.data,
         "recent_tasks": tasks.data,
         "products": products.data,
+        "total_products": len(products.data),
+        "total_research": total_research,
+        "total_tasks": total_tasks,
     }
 
 

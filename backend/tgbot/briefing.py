@@ -21,10 +21,11 @@ async def get_orders_summary() -> dict:
     if not config.SHOPIFY_ACCESS_TOKEN:
         return None
     try:
+        shop = config.SHOPIFY_SHOP_URL.replace("https://", "").replace("http://", "").rstrip("/")
         yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%dT00:00:00Z")
         async with httpx.AsyncClient(timeout=15) as client:
             res = await client.get(
-                f"https://{config.SHOPIFY_SHOP_URL}/admin/api/{config.SHOPIFY_API_VERSION}"
+                f"https://{shop}/admin/api/{config.SHOPIFY_API_VERSION}"
                 f"/orders.json?status=any&created_at_min={yesterday}&limit=250",
                 headers={
                     "X-Shopify-Access-Token": config.SHOPIFY_ACCESS_TOKEN,

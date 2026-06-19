@@ -417,9 +417,9 @@ async function loadDashboard() {
   }
 
   const active = (data.recent_tasks || []).filter(t => t.status === "running").length;
-  animateStat("stat-products", data.products?.length ?? 0);
-  animateStat("stat-research", data.recent_research?.length ?? 0);
-  animateStat("stat-tasks", data.recent_tasks?.length ?? 0);
+  animateStat("stat-products", data.total_products ?? data.products?.length ?? 0);
+  animateStat("stat-research", data.total_research ?? data.recent_research?.length ?? 0);
+  animateStat("stat-tasks", data.total_tasks ?? data.recent_tasks?.length ?? 0);
   animateStat("stat-active", active);
 
   const statusCounts = {};
@@ -854,14 +854,19 @@ async function saveProductEdit(id) {
   if (!name) { showToast("Name is required", null, "error"); return; }
   const btn = document.querySelector("#modal-content .form-submit");
   btn.disabled = true; btn.textContent = "Saving...";
+  const cost_estimate = parseFloat(document.getElementById("ep-cost").value) || null;
+  const sell_price_estimate = parseFloat(document.getElementById("ep-sell").value) || null;
   const fields = {
     name,
     niche: document.getElementById("ep-niche").value.trim() || null,
     score: parseInt(document.getElementById("ep-score").value) || null,
-    cost_estimate: parseFloat(document.getElementById("ep-cost").value) || null,
-    sell_price_estimate: parseFloat(document.getElementById("ep-sell").value) || null,
+    cost_estimate,
+    sell_price_estimate,
     notes: document.getElementById("ep-notes").value.trim() || null,
   };
+  if (cost_estimate && sell_price_estimate && sell_price_estimate > 0) {
+    fields.margin_estimate = parseFloat(((sell_price_estimate - cost_estimate) / sell_price_estimate * 100).toFixed(1));
+  }
   const res = await apiFetch(`/api/dashboard/products/${id}`, "PATCH", fields);
   if (res) {
     Object.assign(_products[id], fields);
@@ -1240,18 +1245,18 @@ document.querySelectorAll(".tab").forEach(tab => {
   });
 });
 
-// Filter buttons
-document.querySelectorAll("#tab-research .filter-btn").forEach(btn => {
+// Filter buttons — exclude score7 toggle (handled by its own onclick)
+document.querySelectorAll("#tab-research .filter-btn[data-filter]").forEach(btn => {
   btn.addEventListener("click", () => {
-    document.querySelectorAll("#tab-research .filter-btn").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll("#tab-research .filter-btn[data-filter]").forEach(b => b.classList.remove("active"));
     btn.classList.add("active");
     loadResearch(btn.dataset.filter);
   });
 });
 
-document.querySelectorAll("#tab-products .filter-btn").forEach(btn => {
+document.querySelectorAll("#tab-products .filter-btn[data-filter]").forEach(btn => {
   btn.addEventListener("click", () => {
-    document.querySelectorAll("#tab-products .filter-btn").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll("#tab-products .filter-btn[data-filter]").forEach(b => b.classList.remove("active"));
     btn.classList.add("active");
     loadProducts(btn.dataset.filter);
   });
