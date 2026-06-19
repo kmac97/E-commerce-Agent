@@ -1025,6 +1025,94 @@ select.form-input { cursor: pointer; }
   30% { transform: translateY(-5px); opacity: 1; }
 }
 
+/* ─── SORT DIVIDER ─── */
+.sort-divider { width: 1px; background: var(--border); align-self: stretch; margin: 0 2px; flex-shrink: 0; }
+
+/* ─── REVENUE CHART ─── */
+.revenue-chart {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 16px 18px; margin-bottom: 8px;
+}
+.revenue-total { font-size: 24px; font-weight: 800; letter-spacing: -0.04em; color: var(--text); margin-bottom: 14px; }
+.revenue-bars { display: flex; align-items: flex-end; gap: 2px; height: 90px; }
+.revenue-bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; cursor: default; }
+.revenue-bar { width: 100%; background: rgba(99,102,241,0.25); border-radius: 2px 2px 0 0; transition: height 0.5s ease, background 0.15s; }
+.revenue-bar.today { background: var(--accent); }
+.revenue-bar-wrap:hover .revenue-bar { background: var(--accent2); }
+.revenue-bar-label { font-size: 8.5px; color: var(--muted); margin-top: 3px; white-space: nowrap; }
+
+/* ─── PROFIT CALCULATOR ─── */
+.calc-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 20px;
+}
+.calc-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 20px; }
+.calc-group { display: flex; flex-direction: column; gap: 6px; }
+.calc-label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.calc-input {
+  background: var(--bg); border: 1px solid var(--border); color: var(--text);
+  border-radius: 8px; padding: 9px 12px; font-size: 14px;
+  font-family: var(--font); outline: none; transition: border-color 0.15s;
+}
+.calc-input:focus { border-color: var(--accent); }
+.calc-hint { color: var(--muted); font-size: 13.5px; text-align: center; padding: 18px 0; }
+.calc-results { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.calc-result-item {
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 14px 16px;
+}
+.calc-result-label { font-size: 10.5px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 6px; }
+.calc-result-value { font-size: 22px; font-weight: 800; letter-spacing: -0.04em; color: var(--text); }
+.calc-result-value.positive { color: var(--green); }
+.calc-result-value.negative { color: var(--red); }
+.calc-result-value.sell-price { color: var(--accent2); }
+
+/* ─── KANBAN BOARD ─── */
+.kanban-board { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 8px; align-items: flex-start; }
+.kanban-board::-webkit-scrollbar { height: 4px; }
+.kanban-board::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.kanban-col {
+  min-width: 170px; flex-shrink: 0;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 12px;
+  transition: border-color 0.2s, background 0.2s;
+}
+.kanban-col.drag-over { border-color: var(--accent); background: var(--accent-glow); }
+.kanban-col-header {
+  font-size: 10.5px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.07em; color: var(--muted);
+  display: flex; justify-content: space-between; align-items: center;
+  padding-bottom: 10px; border-bottom: 1px solid var(--border); margin-bottom: 8px;
+}
+.kanban-count {
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 4px; padding: 1px 6px; font-size: 10px; color: var(--muted2);
+}
+.kanban-card {
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 10px 12px; margin-bottom: 6px;
+  cursor: grab; transition: border-color 0.15s, transform 0.15s;
+  animation: card-in 0.18s ease both;
+}
+.kanban-card:hover { border-color: var(--border-lit); transform: translateY(-1px); }
+.kanban-card.dragging { opacity: 0.35; cursor: grabbing; }
+.kanban-card-title { font-size: 13px; font-weight: 600; color: var(--text); line-height: 1.35; margin-bottom: 4px; letter-spacing: -0.01em; }
+.kanban-card-meta { font-size: 11px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+
+/* ─── AD LIBRARY LINKS ─── */
+.ad-links { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 16px; }
+.ad-links-label { font-size: 10.5px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.ad-link {
+  font-size: 12px; font-weight: 600; color: var(--muted2);
+  background: var(--surface2); border: 1px solid var(--border);
+  padding: 4px 10px; border-radius: 5px; text-decoration: none; transition: all 0.15s;
+}
+.ad-link:hover { color: var(--accent2); border-color: var(--border-lit); }
+
+/* ─── SPY STORE ROW ─── */
+.spy-row { display: flex; align-items: center; margin-bottom: 12px; }
+.spy-results-header { font-size: 12px; color: var(--muted2); margin-bottom: 10px; }
+
 @media (min-width: 480px) {
   .stats-grid { grid-template-columns: repeat(4, 1fr); }
 }
@@ -1032,4 +1120,7 @@ select.form-input { cursor: pointer; }
   .main { padding: 16px; }
   .header { padding: 0 16px; }
   .stat-value { font-size: 28px; }
+  .calc-grid { grid-template-columns: 1fr; }
+  .calc-results { grid-template-columns: 1fr; }
+  .kanban-col { min-width: 145px; }
 }

@@ -180,6 +180,45 @@ async def get_briefing():
     }
 
 
+@router.get("/revenue")
+async def get_revenue(days: int = 30):
+    """Daily revenue from Shopify for the last N days."""
+    import httpx
+    import config
+    from datetime import datetime, timedelta
+    from collections import defaultdict
+
+    if not config.SHOPIFY_ACCESS_TOKEN or not config.SHOPIFY_SHOP_URL:
+        return []
+
+    shop = config.SHOPIFY_SHOP_URL.replace("https://", "").replace("http://", "").rstrip("/")
+    since = (datetime.utcnow() - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            res = await client.get(
+                f"https://{shop}/admin/api/{config.SHOPIFY_API_VERSION}/orders.json",
+                headers={"X-Shopify-Access-Token": config.SHOPIFY_ACCESS_TOKEN},
+                params={"status": "any", "limit": 250, "created_at_min": since,
+                        "fields": "created_at,total_price,financial_status"},
+            )
+        orders = res.json().get("orders", []) if res.status_code == 200 else []
+    except Exception:
+        return []
+
+    daily = defaultdict(float)
+    for o in orders:
+        if o.get("financial_status") in ("paid", "partially_paid"):
+            daily[o["created_at"][:10]] += float(o.get("total_price") or 0)
+
+    return [
+        {"date": (datetime.utcnow() - timedelta(days=days - 1 - i)).strftime("%Y-%m-%d"),
+         "revenue": round(daily.get(
+             (datetime.utcnow() - timedelta(days=days - 1 - i)).strftime("%Y-%m-%d"), 0), 2)}
+        for i in range(days)
+    ]
+
+
 @router.get("/tasks")
 async def get_tasks(status: str = None, limit: int = 50):
     """Get agent task history."""

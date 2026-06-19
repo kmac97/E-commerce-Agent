@@ -58,6 +58,76 @@ class ChatRequest(BaseModel):
     history: list = []
 
 
+@router.post("/import-product")
+async def import_product_from_url(body: dict):
+    """Fetch a product URL and extract structured product data using AI."""
+    import httpx, json, re
+    import config as cfg
+
+    url = body.get("url", "").strip()
+    if not url:
+        return {"error": "URL required"}
+
+    try:
+        async with httpx.AsyncClient(timeout=15, follow_redirects=True,
+                                     headers={"User-Agent": "Mozilla/5.0"}) as client:
+            res = await client.get(url)
+        # Strip tags for a clean text payload
+        text = re.sub(r"<[^>]+>", " ", res.text)
+        text = re.sub(r"\s+", " ", text).strip()[:3500]
+    except Exception as e:
+        return {"error": f"Could not fetch URL: {e}"}
+
+    prompt = (
+        'Extract product details from this page. Return ONLY valid JSON with exactly these keys:\n'
+        '{"name":"product name","niche":"category or niche","cost_estimate":null,"notes":"1-2 sentence description"}\n\n'
+        f'Page text: {text}'
+    )
+
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            r = await client.post(
+                f"{cfg.OPENROUTER_BASE_URL}/chat/completions",
+                headers={"Authorization": f"Bearer {cfg.OPENROUTER_API_KEY}"},
+                json={"model": cfg.OPENROUTER_FAST_MODEL,
+                      "messages": [{"role": "user", "content": prompt}],
+                      "max_tokens": 200, "temperature": 0.2},
+            )
+        reply = r.json()["choices"][0]["message"]["content"]
+        match = re.search(r"\{.*\}", reply, re.DOTALL)
+        return json.loads(match.group()) if match else {"error": "Could not parse product details"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@router.get("/spy-store")
+async def spy_competitor_store(url: str):
+    """Fetch the public product catalogue of any Shopify store."""
+    import httpx, re
+
+    match = re.search(r"([\w-]+\.myshopify\.com)", url)
+    domain = match.group(1) if match else url.replace("https://", "").replace("http://", "").split("/")[0]
+
+    try:
+        async with httpx.AsyncClient(timeout=12, headers={"User-Agent": "Mozilla/5.0"}) as client:
+            res = await client.get(f"https://{domain}/products.json?limit=50")
+        if res.status_code != 200:
+            return {"error": f"Store returned {res.status_code} — it may be private or password protected"}
+        products = res.json().get("products", [])
+        return {
+            "domain": domain,
+            "count": len(products),
+            "products": [{
+                "title": p["title"],
+                "type": p.get("product_type") or "",
+                "price": p["variants"][0]["price"] if p.get("variants") else None,
+                "published": (p.get("published_at") or "")[:10],
+            } for p in products],
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
 @router.post("/chat")
 async def chat_with_max(request: ChatRequest):
     """Send a message to Max and get a response."""

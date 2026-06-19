@@ -345,6 +345,35 @@ function editStatus(productId, currentStatus, el) {
 }
 
 // ─────────────────────────────────────────
+// REVENUE CHART
+// ─────────────────────────────────────────
+
+async function loadRevenue() {
+  const data = await apiFetch("/api/dashboard/revenue?days=30");
+  const el = document.getElementById("revenue-chart");
+  if (!el) return;
+  if (!data || !data.length || !data.some(d => d.revenue > 0)) {
+    el.innerHTML = '<div class="empty">No revenue data — Shopify orders will appear here once connected</div>';
+    return;
+  }
+  const maxRev = Math.max(...data.map(d => d.revenue));
+  const total = data.reduce((s, d) => s + d.revenue, 0);
+  el.innerHTML = `
+    <div class="revenue-total">$${total.toLocaleString("en", {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+    <div class="revenue-bars">
+      ${data.map((d, i) => {
+        const pct = maxRev > 0 ? Math.max(2, (d.revenue / maxRev) * 100) : 2;
+        const isToday = i === data.length - 1;
+        const showLabel = i === 0 || i % 6 === 0 || isToday;
+        return `<div class="revenue-bar-wrap" title="${d.date}: $${d.revenue.toFixed(2)}">
+          <div class="revenue-bar${isToday ? " today" : ""}" style="height:${pct}%"></div>
+          <div class="revenue-bar-label">${showLabel ? d.date.slice(5) : ""}</div>
+        </div>`;
+      }).join("")}
+    </div>`;
+}
+
+// ─────────────────────────────────────────
 // BRIEFING
 // ─────────────────────────────────────────
 
@@ -372,7 +401,8 @@ async function loadBriefing() {
 // ─────────────────────────────────────────
 
 async function loadDashboard() {
-  loadBriefing(); // non-blocking
+  loadBriefing();   // non-blocking
+  loadRevenue();    // non-blocking
   const data = await apiFetch("/api/dashboard/summary");
   if (!data) {
     document.getElementById("recent-tasks").innerHTML = '<div class="empty">Could not reach server.</div>';
@@ -520,8 +550,70 @@ async function loadProducts(status = "") {
   if (!data) { document.getElementById("product-list").innerHTML = '<div class="empty">Could not reach server.</div>'; return; }
   _productsData = data;
   data.forEach(p => _products[p.id] = p);
-  renderProducts();
+  if (_productsView === "kanban") renderKanban(); else renderProducts();
   setTabMeta("products", "loadProducts()");
+}
+
+// ─── KANBAN ───
+let _productsView = "list";
+let _dragProductId = null;
+
+function setProductsView(view) {
+  _productsView = view;
+  document.getElementById("view-list-btn")?.classList.toggle("active", view === "list");
+  document.getElementById("view-kanban-btn")?.classList.toggle("active", view === "kanban");
+  if (view === "kanban") renderKanban();
+  else renderProducts();
+}
+
+function renderKanban() {
+  const statuses = ["idea", "researching", "testing", "active", "dropped"];
+  const byStatus = {};
+  statuses.forEach(s => byStatus[s] = []);
+  _productsData.forEach(p => { const s = p.status || "idea"; if (byStatus[s]) byStatus[s].push(p); });
+
+  const el = document.getElementById("product-list");
+  el.innerHTML = `<div class="kanban-board">${
+    statuses.map(s => `
+      <div class="kanban-col" data-status="${s}"
+           ondragover="event.preventDefault();this.classList.add('drag-over')"
+           ondragleave="this.classList.remove('drag-over')"
+           ondrop="handleKanbanDrop(event,'${s}')">
+        <div class="kanban-col-header">${s}<span class="kanban-count">${byStatus[s].length}</span></div>
+        <div class="kanban-cards">${
+          byStatus[s].map(p => `
+            <div class="kanban-card" draggable="true"
+                 ondragstart="handleKanbanDragStart(event,'${p.id}')"
+                 ondragend="this.classList.remove('dragging')"
+                 onclick="openProduct('${p.id}')">
+              <div class="kanban-card-title">${p.name}</div>
+              <div class="kanban-card-meta">
+                ${p.score ? scoreEl(p.score) : ""}
+                ${p.niche ? `<span>${p.niche}</span>` : ""}
+              </div>
+            </div>`).join("")}
+        </div>
+      </div>`).join("")
+  }</div>`;
+}
+
+function handleKanbanDragStart(e, id) {
+  _dragProductId = id;
+  e.currentTarget.classList.add("dragging");
+  e.dataTransfer.effectAllowed = "move";
+}
+
+async function handleKanbanDrop(e, newStatus) {
+  e.preventDefault();
+  e.currentTarget.classList.remove("drag-over");
+  const id = _dragProductId; _dragProductId = null;
+  if (!id || _products[id]?.status === newStatus) return;
+  _productsData = _productsData.map(p => p.id === id ? { ...p, status: newStatus } : p);
+  _products[id] = { ..._products[id], status: newStatus };
+  renderKanban();
+  const res = await apiFetch(`/api/dashboard/products/${id}/status`, "PATCH", { status: newStatus });
+  if (res) showToast(`Moved to ${newStatus}`);
+  else { showToast("Update failed", null, "error"); loadProducts(); }
 }
 
 function setProductsSort(key) {
@@ -631,6 +723,7 @@ function openResearch(id) {
     ${r.notes ? `<div class="modal-section-label">Notes</div><p class="modal-body">${r.notes}</p>` : ""}
     <div class="modal-section-label">Research Output</div>
     ${body}
+    ${adLinks(r.topic)}
     <div class="modal-actions">
       <button class="btn-to-pipeline" onclick="researchToPipeline('${id}')">+ Add to Pipeline</button>
       <button class="btn-copy" onclick="copyResearch('${id}')">⎘ Copy</button>
@@ -707,6 +800,7 @@ function openProduct(id) {
     ${metaHtml}
     ${p.notes ? `<div class="modal-section-label">Notes</div><p class="modal-body">${p.notes}</p>` : ""}
     ${p.data ? `<div class="modal-section-label">Raw Data</div><pre>${JSON.stringify(p.data, null, 2)}</pre>` : ""}
+    ${adLinks(p.name)}
     <div class="modal-actions">
       <button class="btn-edit" onclick="editProduct('${id}')">✎ Edit</button>
       <button class="btn-shopify" id="shopify-draft-btn" onclick="shopifyDraft('${id}')">→ Shopify Draft</button>
@@ -896,6 +990,119 @@ function closeFormModal() {
 document.getElementById("form-modal").addEventListener("click", function(e) {
   if (e.target === this) closeFormModal();
 });
+
+// ─────────────────────────────────────────
+// PROFIT CALCULATOR
+// ─────────────────────────────────────────
+
+function calcProfit() {
+  const cost     = parseFloat(document.getElementById("calc-cost")?.value) || 0;
+  const shipping = parseFloat(document.getElementById("calc-shipping")?.value) || 0;
+  const ads      = parseFloat(document.getElementById("calc-ads")?.value) || 0;
+  const feePct   = parseFloat(document.getElementById("calc-fee")?.value) || 2.9;
+  const marginPct= parseFloat(document.getElementById("calc-margin")?.value) || 30;
+  const el = document.getElementById("calc-results");
+  if (!el) return;
+
+  const totalCost = cost + shipping + ads;
+  if (!totalCost) { el.innerHTML = '<div class="calc-hint">Enter a cost price above to see your numbers</div>'; return; }
+
+  const fee = feePct / 100;
+  const margin = marginPct / 100;
+  const sell = totalCost / (1 - fee - margin);
+  const profit = sell * (1 - fee) - totalCost;
+  const roi = (profit / totalCost) * 100;
+  const breakeven = totalCost / (1 - fee);
+
+  el.innerHTML = `
+    <div class="calc-result-item">
+      <div class="calc-result-label">Recommended Sell Price</div>
+      <div class="calc-result-value sell-price">$${sell.toFixed(2)}</div>
+    </div>
+    <div class="calc-result-item">
+      <div class="calc-result-label">Profit Per Unit</div>
+      <div class="calc-result-value ${profit >= 0 ? "positive" : "negative"}">$${profit.toFixed(2)}</div>
+    </div>
+    <div class="calc-result-item">
+      <div class="calc-result-label">ROI</div>
+      <div class="calc-result-value ${roi >= 0 ? "positive" : "negative"}">${roi.toFixed(1)}%</div>
+    </div>
+    <div class="calc-result-item">
+      <div class="calc-result-label">Break-even Price</div>
+      <div class="calc-result-value">$${breakeven.toFixed(2)}</div>
+    </div>`;
+}
+
+// ─────────────────────────────────────────
+// URL PRODUCT IMPORT
+// ─────────────────────────────────────────
+
+function showImportURL() {
+  document.getElementById("form-content").innerHTML = `
+    <h2 style="margin-bottom:6px;font-size:17px;font-weight:700;letter-spacing:-0.02em">Import from URL</h2>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:18px">Paste any product page — AliExpress, Amazon, supplier site — and we'll fill in the details.</p>
+    <div class="form-group">
+      <label class="form-label">Product URL *</label>
+      <input class="form-input" id="f-import-url" placeholder="https://..." />
+    </div>
+    <button class="form-submit" onclick="submitImportURL()">Import Product</button>
+  `;
+  document.getElementById("form-modal").classList.remove("hidden");
+  setTimeout(() => document.getElementById("f-import-url")?.focus(), 60);
+}
+
+async function submitImportURL() {
+  const url = document.getElementById("f-import-url").value.trim();
+  if (!url) { showToast("URL is required", null, "error"); return; }
+  const btn = document.querySelector("#form-content .form-submit");
+  btn.disabled = true; btn.textContent = "Fetching…";
+  const res = await apiFetch("/api/agents/import-product", "POST", { url });
+  if (res?.error) {
+    btn.disabled = false; btn.textContent = "Import Product";
+    showToast(res.error, null, "error"); return;
+  }
+  closeFormModal();
+  showAddProduct({ name: res.name, niche: res.niche, score: res.score, notes: res.notes });
+}
+
+// ─────────────────────────────────────────
+// COMPETITOR SPY
+// ─────────────────────────────────────────
+
+async function spyStore() {
+  const url = document.getElementById("spy-input")?.value.trim();
+  if (!url) { showToast("Enter a store URL", null, "error"); return; }
+  const el = document.getElementById("spy-results");
+  el.innerHTML = '<div class="loading">Fetching store catalogue</div>';
+  const res = await apiFetch(`/api/agents/spy-store?url=${encodeURIComponent(url)}`);
+  if (!res || res.error) {
+    el.innerHTML = `<div class="empty">${res?.error || "Could not reach store"}</div>`; return;
+  }
+  el.innerHTML = `<div class="spy-results-header">${res.count} products found at ${res.domain}</div>` +
+    res.products.map(p => `
+      <div class="card" style="cursor:default">
+        <div class="card-header">
+          <div class="card-title">${p.title}</div>
+          ${p.price ? `<span class="score score-mid">$${p.price}</span>` : ""}
+        </div>
+        <div class="card-meta">${[p.type, p.published].filter(Boolean).join(" · ")}</div>
+        <button class="empty-cta-btn" style="margin-top:8px;font-size:11.5px" onclick="showAddProduct({name:${JSON.stringify(p.title)},niche:${JSON.stringify(p.type)}})">+ Add to Pipeline</button>
+      </div>`).join("");
+}
+
+// ─────────────────────────────────────────
+// AD LIBRARY LINKS
+// ─────────────────────────────────────────
+
+function adLinks(keyword) {
+  const q = encodeURIComponent(keyword);
+  return `<div class="ad-links">
+    <span class="ad-links-label">Search ads:</span>
+    <a class="ad-link" href="https://www.facebook.com/ads/library/?q=${q}&search_type=keyword_unordered" target="_blank" rel="noopener">FB Ads</a>
+    <a class="ad-link" href="https://ads.tiktok.com/business/creativecenter/inspiration/topads/pc/en?keyword=${q}" target="_blank" rel="noopener">TikTok</a>
+    <a class="ad-link" href="https://www.google.com/search?q=${q}+buy+online" target="_blank" rel="noopener">Google</a>
+  </div>`;
+}
 
 // ─────────────────────────────────────────
 // MAX CHAT
