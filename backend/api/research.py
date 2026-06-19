@@ -2,8 +2,15 @@
 # Endpoints for viewing saved research from Supabase.
 
 from fastapi import APIRouter, Query
+from pydantic import BaseModel
+from typing import Optional
 
 router = APIRouter()
+
+
+class ResearchUpdate(BaseModel):
+    score: Optional[int] = None
+    notes: Optional[str] = None
 
 
 @router.get("/")
@@ -25,6 +32,16 @@ async def get_research_item(research_id: str):
         from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="Research not found")
     return item
+
+
+@router.patch("/{research_id}")
+async def update_research_item(research_id: str, body: ResearchUpdate):
+    """Update research score or notes."""
+    from database.client import update_research_fields
+    fields = {k: v for k, v in body.dict().items() if v is not None}
+    if fields:
+        await update_research_fields(research_id, fields)
+    return {"status": "updated"}
 
 
 @router.delete("/{research_id}")

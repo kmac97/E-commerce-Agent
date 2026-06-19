@@ -22,6 +22,15 @@ let _productsScore7 = false;
 // Last loaded timestamps per tab
 const _lastLoaded = {};
 
+// Pinned items (persisted in localStorage)
+const _pinned = {
+  research: new Set(JSON.parse(localStorage.getItem("pinned_research") || "[]")),
+  products: new Set(JSON.parse(localStorage.getItem("pinned_products") || "[]")),
+};
+function savePin(type) {
+  localStorage.setItem(`pinned_${type}`, JSON.stringify([..._pinned[type]]));
+}
+
 // ─────────────────────────────────────────
 // API
 // ─────────────────────────────────────────
@@ -148,6 +157,81 @@ function scoreEl(score) {
 
 function deleteBtn(onclick) {
   return `<button class="btn-delete" onclick="event.stopPropagation();${onclick}" title="Delete">×</button>`;
+}
+
+function pinBtn(type, id) {
+  const pinned = _pinned[type].has(id);
+  return `<button class="btn-pin${pinned ? " pinned" : ""}" onclick="event.stopPropagation();togglePin('${type}','${id}')" title="${pinned ? "Unpin" : "Pin to top"}">★</button>`;
+}
+
+function togglePin(type, id) {
+  if (_pinned[type].has(id)) _pinned[type].delete(id);
+  else _pinned[type].add(id);
+  savePin(type);
+  if (type === "research") renderResearch();
+  else renderProducts();
+}
+
+function setTabBadge(tabName) {
+  const tab = document.querySelector(`.tab[data-tab="${tabName}"]`);
+  if (!tab || tab.classList.contains("active")) return;
+  if (!tab.querySelector(".tab-badge")) {
+    const dot = document.createElement("span");
+    dot.className = "tab-badge";
+    tab.appendChild(dot);
+  }
+}
+
+function clearTabBadge(tabName) {
+  document.querySelector(`.tab[data-tab="${tabName}"] .tab-badge`)?.remove();
+}
+
+function editResearchScore(id, currentScore, el) {
+  const input = document.createElement("input");
+  input.type = "number"; input.min = 1; input.max = 10;
+  input.value = currentScore || ""; input.className = "score-input";
+  const restore = () => { if (input.parentNode) input.replaceWith(el); };
+  const save = async () => {
+    const score = parseInt(input.value);
+    if (!score || score < 1 || score > 10) { restore(); return; }
+    const res = await apiFetch(`/api/research/${id}`, "PATCH", { score });
+    if (res && !res.error) {
+      _research[id] = { ..._research[id], score };
+      _researchData = _researchData.map(r => r.id === id ? { ...r, score } : r);
+      showToast(`Score → ${score}/10`);
+      renderResearch();
+    } else { restore(); showToast("Update failed", null, "error"); }
+  };
+  el.replaceWith(input); input.focus(); input.select();
+  input.addEventListener("blur", save);
+  input.addEventListener("keydown", e => {
+    if (e.key === "Enter") { e.preventDefault(); input.blur(); }
+    if (e.key === "Escape") { e.preventDefault(); restore(); }
+  });
+}
+
+function editProductScore(id, currentScore, el) {
+  const input = document.createElement("input");
+  input.type = "number"; input.min = 1; input.max = 10;
+  input.value = currentScore || ""; input.className = "score-input";
+  const restore = () => { if (input.parentNode) input.replaceWith(el); };
+  const save = async () => {
+    const score = parseInt(input.value);
+    if (!score || score < 1 || score > 10) { restore(); return; }
+    const res = await apiFetch(`/api/dashboard/products/${id}`, "PATCH", { score });
+    if (res) {
+      _products[id] = { ..._products[id], score };
+      _productsData = _productsData.map(p => p.id === id ? { ...p, score } : p);
+      showToast(`Score → ${score}/10`);
+      renderProducts();
+    } else { restore(); showToast("Update failed", null, "error"); }
+  };
+  el.replaceWith(input); input.focus(); input.select();
+  input.addEventListener("blur", save);
+  input.addEventListener("keydown", e => {
+    if (e.key === "Enter") { e.preventDefault(); input.blur(); }
+    if (e.key === "Escape") { e.preventDefault(); restore(); }
+  });
 }
 
 function escHtml(s) {
@@ -400,20 +484,28 @@ function renderResearch() {
         : `<div class="empty-cta"><div class="empty-cta-icon">🔬</div><div class="empty-cta-text">No research saved yet</div><button class="empty-cta-btn" onclick="showAddResearch()">+ Start Research</button></div>`;
     return;
   }
-  el.innerHTML = displayed.map(r => `
+  const pinned = displayed.filter(r => _pinned.research.has(r.id));
+  const unpinned = displayed.filter(r => !_pinned.research.has(r.id));
+  el.innerHTML = [...pinned, ...unpinned].map(r => {
+    const cls = r.score >= 7 ? "score-high" : r.score >= 5 ? "score-mid" : "score-low";
+    const scoreHtml = r.score
+      ? `<span class="score ${cls}" style="cursor:pointer" title="Click to edit score" onclick="event.stopPropagation();editResearchScore('${r.id}',${r.score},this)">${r.score}/10</span>`
+      : "";
+    return `
     <div class="card" onclick="openResearch('${r.id}')">
       <div class="card-header">
         <div class="card-title">${r.topic}</div>
         <div style="display:flex;gap:6px;align-items:center">
-          ${r.score ? scoreEl(r.score) : ""}
+          ${scoreHtml}
           ${badge(r.type, r.type)}
+          ${pinBtn("research", r.id)}
           ${deleteBtn(`deleteResearch('${r.id}',this)`)}
         </div>
       </div>
       <div class="card-meta">${timeAgo(r.created_at)}</div>
       ${r.notes ? `<div class="card-snippet">${r.notes}</div>` : ""}
-    </div>
-  `).join("");
+    </div>`;
+  }).join("");
 }
 
 function searchResearch(query) { renderResearch(); }
@@ -466,21 +558,29 @@ function renderProducts() {
         : `<div class="empty-cta"><div class="empty-cta-icon">📦</div><div class="empty-cta-text">No products in pipeline yet</div><button class="empty-cta-btn" onclick="showAddProduct()">+ Add Product</button></div>`;
     return;
   }
-  el.innerHTML = displayed.map(p => `
+  const pinnedP = displayed.filter(p => _pinned.products.has(p.id));
+  const unpinnedP = displayed.filter(p => !_pinned.products.has(p.id));
+  el.innerHTML = [...pinnedP, ...unpinnedP].map(p => {
+    const cls = p.score >= 7 ? "score-high" : p.score >= 5 ? "score-mid" : "score-low";
+    const scoreHtml = p.score
+      ? `<span class="score ${cls}" style="cursor:pointer" title="Click to edit score" onclick="event.stopPropagation();editProductScore('${p.id}',${p.score},this)">${p.score}/10</span>`
+      : "";
+    return `
     <div class="card" onclick="openProduct('${p.id}')">
       <div class="card-header">
         <div class="card-title">${p.name}</div>
         <div style="display:flex;gap:6px;align-items:center">
-          ${p.score ? scoreEl(p.score) : ""}
+          ${scoreHtml}
           <span class="badge badge-${p.status || 'idea'}" onclick="event.stopPropagation();editStatus('${p.id}','${p.status || 'idea'}',this)">${p.status || "idea"}</span>
+          ${pinBtn("products", p.id)}
           ${deleteBtn(`deleteProduct('${p.id}',this)`)}
         </div>
       </div>
       ${p.niche ? `<div class="card-meta">Niche: ${p.niche}</div>` : ""}
       ${p.margin_estimate ? `<div class="card-meta">Est. margin: ${p.margin_estimate}%</div>` : ""}
       ${p.notes ? `<div class="card-snippet">${p.notes}</div>` : ""}
-    </div>
-  `).join("");
+    </div>`;
+  }).join("");
 }
 
 function searchProducts(query) { renderProducts(); }
@@ -609,6 +709,7 @@ function openProduct(id) {
     ${p.data ? `<div class="modal-section-label">Raw Data</div><pre>${JSON.stringify(p.data, null, 2)}</pre>` : ""}
     <div class="modal-actions">
       <button class="btn-edit" onclick="editProduct('${id}')">✎ Edit</button>
+      <button class="btn-shopify" id="shopify-draft-btn" onclick="shopifyDraft('${id}')">→ Shopify Draft</button>
     </div>
   `;
   document.getElementById("research-modal").classList.remove("hidden");
@@ -774,6 +875,8 @@ function pollTask(taskId, label) {
     if (task.status === "complete") {
       clearInterval(interval);
       showToast(`✓ Research done: "${label}"`);
+      setTabBadge("research");
+      setTabBadge("tasks");
       const activeTab = document.querySelector(".tab.active")?.dataset.tab;
       if (activeTab === "research") loadResearch(currentResearchFilter);
       if (activeTab === "dashboard") loadDashboard();
@@ -797,6 +900,41 @@ document.getElementById("form-modal").addEventListener("click", function(e) {
 // ─────────────────────────────────────────
 // MAX CHAT
 // ─────────────────────────────────────────
+
+async function analyseMyPipeline() {
+  // Switch to Max tab first
+  const maxTab = document.querySelector('.tab[data-tab="max"]');
+  if (maxTab && !maxTab.classList.contains("active")) maxTab.click();
+  await new Promise(r => setTimeout(r, 80));
+
+  // Use cached data or fetch fresh
+  const products = _productsData.length ? _productsData : (await apiFetch("/api/dashboard/products") || []);
+  const research = _researchData.length ? _researchData : (await apiFetch("/api/research/?limit=10") || []);
+
+  const productLines = products.slice(0, 12).map(p =>
+    `• ${p.name} (${p.status || "idea"}${p.score ? `, score ${p.score}/10` : ""}${p.niche ? `, niche: ${p.niche}` : ""})`
+  ).join("\n") || "None yet";
+
+  const researchLines = research.slice(0, 8).map(r =>
+    `• ${r.topic} (${r.type}${r.score ? `, score ${r.score}/10` : ""})`
+  ).join("\n") || "None yet";
+
+  const msg = `Analyse my e-commerce pipeline and give me specific, actionable advice.\n\nMy products (${products.length} total):\n${productLines}\n\nRecent research (${research.length} items):\n${researchLines}\n\nWhat should I prioritise right now and what concrete next steps would you take?`;
+  sendPrompt(msg);
+}
+
+async function shopifyDraft(productId) {
+  const btn = document.getElementById("shopify-draft-btn");
+  if (btn) { btn.disabled = true; btn.textContent = "Creating…"; }
+  const res = await apiFetch(`/api/dashboard/products/${productId}/shopify-draft`, "POST");
+  if (res?.url) {
+    showToast("Draft created in Shopify ✓");
+    window.open(res.url, "_blank", "noopener");
+  } else {
+    showToast(res?.error || "Failed to create draft", null, "error");
+  }
+  if (btn) { btn.disabled = false; btn.textContent = "→ Shopify Draft"; }
+}
 
 function sendPrompt(text) {
   const input = document.getElementById("chat-input");
@@ -873,6 +1011,7 @@ document.querySelectorAll(".tab").forEach(tab => {
     document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
     document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
     tab.classList.add("active");
+    clearTabBadge(tab.dataset.tab);
     const target = document.getElementById(`tab-${tab.dataset.tab}`);
     if (target) target.classList.add("active");
 

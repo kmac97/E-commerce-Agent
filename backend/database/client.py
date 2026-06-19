@@ -109,6 +109,11 @@ async def get_research_by_id(research_id: str) -> Optional[dict]:
     return result.data[0] if result.data else None
 
 
+async def update_research_fields(research_id: str, fields: dict):
+    """Update arbitrary research fields (score, notes, etc)."""
+    supabase.table("research").update(fields).eq("id", research_id).execute()
+
+
 async def delete_research(research_id: str):
     """Delete a research item."""
     supabase.table("research").delete().eq("id", research_id).execute()

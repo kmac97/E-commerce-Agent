@@ -109,6 +109,47 @@ async def delete_product_item(product_id: str):
     return {"status": "deleted"}
 
 
+@router.post("/products/{product_id}/shopify-draft")
+async def create_shopify_draft(product_id: str):
+    """Push a product to Shopify as a draft listing."""
+    import httpx
+    import config
+    from database.client import supabase
+
+    if not config.SHOPIFY_ACCESS_TOKEN or not config.SHOPIFY_SHOP_URL:
+        return {"error": "Shopify not configured — add SHOPIFY_ACCESS_TOKEN and SHOPIFY_STORE_URL to .env"}
+
+    result = supabase.table("products").select("*").eq("id", product_id).execute()
+    if not result.data:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    p = result.data[0]
+    shop = config.SHOPIFY_SHOP_URL.replace("https://", "").replace("http://", "").rstrip("/")
+
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        res = await client.post(
+            f"https://{shop}/admin/api/{config.SHOPIFY_API_VERSION}/products.json",
+            headers={"X-Shopify-Access-Token": config.SHOPIFY_ACCESS_TOKEN},
+            json={"product": {
+                "title": p["name"],
+                "body_html": p.get("notes") or "",
+                "status": "draft",
+                "tags": p.get("niche") or "",
+            }},
+        )
+
+    if res.status_code == 201:
+        draft = res.json()["product"]
+        store_name = shop.replace(".myshopify.com", "")
+        return {
+            "shopify_id": draft["id"],
+            "url": f"https://admin.shopify.com/store/{store_name}/products/{draft['id']}",
+            "title": draft["title"],
+        }
+    return {"error": f"Shopify error ({res.status_code}) — check your access token"}
+
+
 @router.get("/briefing")
 async def get_briefing():
     """Return today's briefing data as structured JSON."""
