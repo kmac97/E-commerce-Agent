@@ -358,17 +358,21 @@ async function loadRevenue() {
   const data = await apiFetch("/api/dashboard/revenue?days=30");
   const el = document.getElementById("revenue-chart");
   if (!el) return;
-  if (!data || !data.length || !data.some(d => d.revenue > 0)) {
-    el.innerHTML = '<div class="empty">No revenue data — Shopify orders will appear here once connected</div>';
+  if (!data || !data.length) {
+    el.innerHTML = '<div class="empty">Could not load revenue data</div>';
     return;
   }
   const maxRev = Math.max(...data.map(d => d.revenue));
   const total = data.reduce((s, d) => s + d.revenue, 0);
+  if (maxRev === 0) {
+    el.innerHTML = `<div class="revenue-total">$0.00</div><div class="empty" style="padding-top:8px;border-top:1px solid var(--border);margin-top:12px">No paid orders in the last 30 days</div>`;
+    return;
+  }
   el.innerHTML = `
     <div class="revenue-total">$${total.toLocaleString("en", {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
     <div class="revenue-bars">
       ${data.map((d, i) => {
-        const pct = maxRev > 0 ? Math.max(2, (d.revenue / maxRev) * 100) : 2;
+        const pct = Math.max(2, (d.revenue / maxRev) * 100);
         const isToday = i === data.length - 1;
         const showLabel = i === 0 || i % 6 === 0 || isToday;
         return `<div class="revenue-bar-wrap" title="${d.date}: $${d.revenue.toFixed(2)}">
