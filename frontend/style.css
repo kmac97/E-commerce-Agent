@@ -760,12 +760,12 @@ body {
 /* ─── EXPORT BUTTON ─── */
 .export-btn {
   font-size: 10.5px; font-weight: 600;
-  background: var(--surface2); border: 1px solid var(--border);
-  color: var(--muted); padding: 3px 8px; border-radius: 5px;
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1);
+  color: var(--muted2); padding: 3px 8px; border-radius: 5px;
   cursor: pointer; font-family: var(--font); transition: all 0.15s;
   text-transform: none; letter-spacing: 0; flex-shrink: 0;
 }
-.export-btn:hover { color: var(--green); border-color: rgba(16,185,129,0.3); }
+.export-btn:hover { color: var(--green); border-color: rgba(16,185,129,0.35); background: rgba(16,185,129,0.06); }
 
 /* ─── ANALYSE BUTTON ─── */
 .btn-analyse {
@@ -910,13 +910,18 @@ select.form-input { cursor: pointer; }
 }
 .prompt-chips::-webkit-scrollbar { display: none; }
 .prompt-chip {
-  background: var(--surface2); border: 1px solid var(--border);
-  color: var(--muted2); padding: 6px 12px; border-radius: 20px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
+  border: 1px solid rgba(255,255,255,0.1);
+  color: var(--muted2); padding: 6px 14px; border-radius: 20px;
   font-size: 12.5px; font-weight: 500; cursor: pointer;
   white-space: nowrap; font-family: var(--font); transition: all 0.15s;
   flex-shrink: 0;
 }
-.prompt-chip:hover { border-color: var(--border-lit); color: var(--accent2); background: var(--accent-glow); }
+.prompt-chip:hover {
+  border-color: rgba(99,102,241,0.45); color: var(--accent2);
+  background: linear-gradient(135deg, rgba(99,102,241,0.13), rgba(167,139,250,0.08));
+  box-shadow: 0 2px 10px rgba(99,102,241,0.18);
+}
 
 /* ─── CHAT UI ─── */
 .chat-wrap {
@@ -1050,11 +1055,18 @@ select.form-input { cursor: pointer; }
 .calc-group { display: flex; flex-direction: column; gap: 6px; }
 .calc-label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
 .calc-input {
-  background: var(--bg); border: 1px solid var(--border); color: var(--text);
+  background: var(--surface2); border: 1px solid rgba(255,255,255,0.1); color: var(--text);
   border-radius: 8px; padding: 9px 12px; font-size: 14px;
-  font-family: var(--font); outline: none; transition: border-color 0.15s;
+  font-family: var(--font); outline: none; transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+  -moz-appearance: textfield;
 }
-.calc-input:focus { border-color: var(--accent); }
+.calc-input::-webkit-outer-spin-button,
+.calc-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.calc-input:focus {
+  border-color: rgba(99,102,241,0.5);
+  background: rgba(99,102,241,0.05);
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.09);
+}
 .calc-hint { color: var(--muted); font-size: 13.5px; text-align: center; padding: 18px 0; }
 .calc-results { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
 .calc-result-item {
