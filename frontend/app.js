@@ -1090,6 +1090,27 @@ async function submitImportURL() {
 // COMPETITOR SPY
 // ─────────────────────────────────────────
 
+async function findProducts() {
+  const btn = document.getElementById("find-products-btn");
+  if (!btn || btn.disabled) return;
+  btn.disabled = true;
+  btn.textContent = "Searching…";
+  showToast("Max is searching for real products — this takes ~20s", null, "info");
+  const res = await apiFetch("/api/agents/find-products", "POST");
+  btn.disabled = false;
+  btn.textContent = "⚡ Find";
+  if (!res || res.error) {
+    showToast(res?.error || "Search failed", null, "error");
+    return;
+  }
+  if (res.found === 0) {
+    showToast("No new products found — all already in pipeline", null, "info");
+    return;
+  }
+  showToast(`Max found ${res.found} real products — added to pipeline!`);
+  loadProducts();
+}
+
 async function spyStore() {
   const url = document.getElementById("spy-input")?.value.trim();
   if (!url) { showToast("Enter a store URL", null, "error"); return; }

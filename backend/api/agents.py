@@ -128,6 +128,121 @@ async def spy_competitor_store(url: str):
         return {"error": str(e)}
 
 
+@router.post("/find-products")
+async def find_products_agent():
+    """
+    Search the web for real trending products and add them to the pipeline.
+    Runs 4 parallel Tavily searches then uses AI to extract specific named products with prices.
+    """
+    import asyncio, json, re
+    import httpx
+    import config as cfg
+    from database.client import save_product, supabase
+
+    if not cfg.TAVILY_API_KEY:
+        return {"error": "Tavily API key not configured"}
+    if not cfg.OPENROUTER_API_KEY:
+        return {"error": "OpenRouter API key not configured"}
+
+    queries = [
+        "best winning dropshipping products to sell right now 2026 specific items AliExpress price",
+        "TikTok viral products 2026 trending items people buying where to get",
+        "top selling products online 2026 high demand low competition dropshipping",
+        "new trending products ecommerce 2026 bestseller profit margin",
+    ]
+
+    async def tavily(client, q):
+        try:
+            r = await client.post(
+                "https://api.tavily.com/search",
+                json={"api_key": cfg.TAVILY_API_KEY, "query": q,
+                      "search_depth": "advanced", "max_results": 5, "include_answer": True},
+            )
+            return r.json()
+        except Exception:
+            return {}
+
+    async with httpx.AsyncClient(timeout=20) as client:
+        results = await asyncio.gather(*[tavily(client, q) for q in queries])
+
+    snippets = []
+    for d in results:
+        if d.get("answer"):
+            snippets.append(d["answer"])
+        for r in d.get("results", [])[:4]:
+            snippets.append(f"{r.get('title','')}: {r.get('content','')[:350]}")
+
+    if not snippets:
+        return {"error": "No search results returned — check Tavily API key"}
+
+    context = "\n\n".join(snippets)[:6000]
+
+    async with httpx.AsyncClient(timeout=45) as client:
+        r = await client.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers={"Authorization": f"Bearer {cfg.OPENROUTER_API_KEY}", "Content-Type": "application/json"},
+            json={
+                "model": cfg.OPENROUTER_MODEL,
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are an expert e-commerce product researcher. "
+                            "From the search results below, extract REAL SPECIFIC products that people are buying right now. "
+                            "These must be actual named products someone can source and resell — not categories or vague ideas. "
+                            "Good examples: 'Magnetic Phone Wallet Card Holder', 'LED Strip Lights 5M RGB USB', 'Portable Blender USB 6-Blade Mini'. "
+                            "Bad examples: 'fitness equipment', 'home decor', 'tech gadgets'. "
+                            "For each product: estimate AliExpress/wholesale cost_estimate (USD), typical sell_price_estimate (USD), "
+                            "score 1-10 (trend strength × margin potential), and write notes explaining why it is trending with specific evidence. "
+                            "Return ONLY a JSON array, no other text:\n"
+                            '[{"name":"...","niche":"...","score":8,"cost_estimate":3.50,"sell_price_estimate":19.99,"notes":"..."}]'
+                        ),
+                    },
+                    {"role": "user", "content": f"Extract 6–8 real products from this research:\n\n{context}"},
+                ],
+                "max_tokens": 2000,
+                "temperature": 0.2,
+            },
+        )
+        ai = r.json()
+
+    raw = ai["choices"][0]["message"]["content"].strip()
+    match = re.search(r"\[.*\]", raw, re.DOTALL)
+    if not match:
+        return {"error": "AI did not return a product list — try again"}
+
+    try:
+        products = json.loads(match.group())
+    except Exception:
+        return {"error": "Could not parse AI response"}
+
+    existing = supabase.table("products").select("name").execute()
+    existing_names = {p["name"].lower() for p in (existing.data or [])}
+
+    saved = []
+    for p in products[:8]:
+        name = (p.get("name") or "").strip()
+        if not name or name.lower() in existing_names:
+            continue
+        cost = p.get("cost_estimate")
+        sell = p.get("sell_price_estimate")
+        margin = round((sell - cost) / sell * 100, 1) if cost and sell and sell > 0 else None
+        result = await save_product(
+            name=name,
+            niche=p.get("niche"),
+            score=int(p["score"]) if p.get("score") else None,
+            notes=p.get("notes"),
+            cost_estimate=cost,
+            sell_price_estimate=sell,
+            margin_estimate=margin,
+        )
+        if result:
+            saved.append(result)
+            existing_names.add(name.lower())
+
+    return {"found": len(saved), "products": saved}
+
+
 @router.post("/chat")
 async def chat_with_max(request: ChatRequest):
     """Send a message to Max and get a response."""
