@@ -1148,15 +1148,13 @@ function adLinks(keyword) {
   </div>`;
 }
 
-// Google Trends — embedded via Google's own widget (no dependency, no rate limit)
+// Google Trends — link out to the real chart (Google blocks reliable in-page embedding)
 function trendsEmbed(keyword) {
-  const req = { comparisonItem: [{ keyword, geo: "", time: "today 12-m" }], category: 0, property: "" };
-  const tz = new Date().getTimezoneOffset();
-  const src = `https://trends.google.com/trends/embed/explore/TIMESERIES?req=${encodeURIComponent(JSON.stringify(req))}&tz=${tz}`;
   const full = `https://trends.google.com/trends/explore?date=today%2012-m&q=${encodeURIComponent(keyword)}`;
-  return `<div class="modal-section-label">📈 Search Interest (12 mo) — rising or dying?</div>
-    <iframe class="trends-frame" src="${src}" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
-    <a class="trends-fallback" href="${full}" target="_blank" rel="noopener">Chart not loading? Open in Google Trends →</a>`;
+  return `<div class="modal-section-label">📈 Trend Check</div>
+    <a class="trends-btn" href="${full}" target="_blank" rel="noopener">
+      📈 See 12-month search interest — is it rising or dying? →
+    </a>`;
 }
 
 // ─────────────────────────────────────────
