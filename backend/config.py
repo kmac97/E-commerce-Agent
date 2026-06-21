@@ -14,10 +14,10 @@ load_dotenv()
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
-# Primary model — Llama 3.3 70B: Dec 2024 knowledge cutoff, strong instruction following
-OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "meta-llama/llama-3.3-70b-instruct")
+# Primary model — Perplexity Sonar Pro: built-in live internet search, always current
+OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "perplexity/sonar-pro")
 
-# Fast model for simple extraction tasks
+# Fast model for extraction tasks (no live search needed)
 OPENROUTER_FAST_MODEL = os.getenv("OPENROUTER_FAST_MODEL", "meta-llama/llama-3.1-8b-instruct")
 
 # Model settings

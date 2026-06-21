@@ -182,7 +182,7 @@ async def find_products_agent():
             "https://openrouter.ai/api/v1/chat/completions",
             headers={"Authorization": f"Bearer {cfg.OPENROUTER_API_KEY}", "Content-Type": "application/json"},
             json={
-                "model": cfg.OPENROUTER_MODEL,
+                "model": "meta-llama/llama-3.3-70b-instruct",
                 "messages": [
                     {
                         "role": "system",
@@ -250,42 +250,44 @@ async def chat_with_max(request: ChatRequest):
     import config as cfg
     from tgbot.commands import SYSTEM_PROMPT
 
-    # Skip live search only for pure chit-chat — everything else benefits from real-time data
-    skip_search = ["hello", "hi ", "hey ", "thanks", "thank you", "bye", "how are you", "what's up", "sup"]
-    needs_realtime = not any(t in request.message.lower() for t in skip_search)
-
     from datetime import datetime
     today = datetime.utcnow().strftime("%A, %d %B %Y")
     system = SYSTEM_PROMPT + f"\n\nToday's date: {today}."
 
-    if needs_realtime and cfg.TAVILY_API_KEY:
-        try:
-            async with httpx.AsyncClient(timeout=12) as client:
-                r = await client.post(
-                    "https://api.tavily.com/search",
-                    json={"api_key": cfg.TAVILY_API_KEY, "query": request.message,
-                          "search_depth": "advanced", "max_results": 5, "include_answer": True},
-                )
-                d = r.json()
-                snippets = []
-                if d.get("answer"):
-                    snippets.append(d["answer"])
-                for result in d.get("results", [])[:4]:
-                    snippets.append(f"- {result.get('title', '')}: {result.get('content', '')[:300]}")
-                if snippets:
-                    system += "\n\nLIVE WEB DATA (use this, it is current):\n" + "\n".join(snippets)
-        except Exception:
-            pass
+    # Perplexity/online models have built-in live search — skip Tavily to avoid conflicts
+    is_online_model = "perplexity" in cfg.OPENROUTER_MODEL or "sonar" in cfg.OPENROUTER_MODEL
+
+    if not is_online_model and cfg.TAVILY_API_KEY:
+        skip_search = ["hello", "hi ", "hey ", "thanks", "thank you", "bye", "how are you"]
+        needs_realtime = not any(t in request.message.lower() for t in skip_search)
+        if needs_realtime:
+            try:
+                async with httpx.AsyncClient(timeout=12) as client:
+                    r = await client.post(
+                        "https://api.tavily.com/search",
+                        json={"api_key": cfg.TAVILY_API_KEY, "query": request.message,
+                              "search_depth": "advanced", "max_results": 5, "include_answer": True},
+                    )
+                    d = r.json()
+                    snippets = []
+                    if d.get("answer"):
+                        snippets.append(d["answer"])
+                    for result in d.get("results", [])[:4]:
+                        snippets.append(f"- {result.get('title', '')}: {result.get('content', '')[:300]}")
+                    if snippets:
+                        system += "\n\nLIVE WEB DATA (use this, it is current):\n" + "\n".join(snippets)
+            except Exception:
+                pass
 
     messages = [{"role": "system", "content": system}]
     messages += request.history[-20:]
     messages.append({"role": "user", "content": request.message})
 
-    async with httpx.AsyncClient(timeout=30) as client:
+    async with httpx.AsyncClient(timeout=45) as client:
         res = await client.post(
             "https://openrouter.ai/api/v1/chat/completions",
             headers={"Authorization": f"Bearer {cfg.OPENROUTER_API_KEY}", "Content-Type": "application/json"},
-            json={"model": cfg.OPENROUTER_MODEL, "messages": messages, "max_tokens": 500, "temperature": 0.85},
+            json={"model": cfg.OPENROUTER_MODEL, "messages": messages, "max_tokens": 700, "temperature": 0.85},
         )
         data = res.json()
         reply = data["choices"][0]["message"]["content"].strip()
