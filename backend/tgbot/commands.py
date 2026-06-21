@@ -338,45 +338,34 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Keep last 20 messages to avoid token overflow
     history = _conversation_history[chat_id][-20:]
 
-    # Detect if the question needs real-time data
-    realtime_triggers = [
-        "trend", "trending", "selling", "sell now", "hot right now", "what's hot",
-        "right now", "currently", "today", "this week", "this month", "2024", "2025", "2026",
-        "winning product", "best product", "top product", "what should i", "niche",
-        "market", "demand", "popular", "viral", "tiktok", "ads", "opportunity",
-    ]
-    needs_realtime = any(t in text.lower() for t in realtime_triggers)
+    from datetime import datetime
+    today = datetime.utcnow().strftime("%A, %d %B %Y")
+    system = SYSTEM_PROMPT + f"\n\nToday's date: {today}."
 
-    # If real-time data needed, do a quick Tavily search and inject results
-    live_context = ""
-    if needs_realtime and cfg.TAVILY_API_KEY:
-        try:
-            async with httpx.AsyncClient(timeout=15) as client:
-                tavily_res = await client.post(
-                    "https://api.tavily.com/search",
-                    json={
-                        "api_key": cfg.TAVILY_API_KEY,
-                        "query": text,
-                        "search_depth": "basic",
-                        "max_results": 4,
-                        "include_answer": True,
-                    },
-                )
-                tavily_data = tavily_res.json()
-                snippets = []
-                if tavily_data.get("answer"):
-                    snippets.append(tavily_data["answer"])
-                for r in tavily_data.get("results", [])[:3]:
-                    snippets.append(f"- {r.get('title', '')}: {r.get('content', '')[:200]}")
-                if snippets:
-                    live_context = "LIVE WEB DATA (use this to answer, today's date is 2026):\n" + "\n".join(snippets)
-        except Exception as e:
-            logger.warning(f"Tavily quick search failed: {e}")
+    # Perplexity/online models have built-in live search — skip Tavily to avoid conflicts
+    is_online_model = "perplexity" in cfg.OPENROUTER_MODEL or "sonar" in cfg.OPENROUTER_MODEL
 
-    # Build messages for the LLM
-    system = SYSTEM_PROMPT
-    if live_context:
-        system = SYSTEM_PROMPT + f"\n\n{live_context}"
+    if not is_online_model and cfg.TAVILY_API_KEY:
+        skip_search = ["hello", "hi ", "hey ", "thanks", "thank you", "bye", "how are you"]
+        needs_realtime = not any(t in text.lower() for t in skip_search)
+        if needs_realtime:
+            try:
+                async with httpx.AsyncClient(timeout=15) as client:
+                    tavily_res = await client.post(
+                        "https://api.tavily.com/search",
+                        json={"api_key": cfg.TAVILY_API_KEY, "query": text,
+                              "search_depth": "advanced", "max_results": 5, "include_answer": True},
+                    )
+                    tavily_data = tavily_res.json()
+                    snippets = []
+                    if tavily_data.get("answer"):
+                        snippets.append(tavily_data["answer"])
+                    for r in tavily_data.get("results", [])[:4]:
+                        snippets.append(f"- {r.get('title', '')}: {r.get('content', '')[:300]}")
+                    if snippets:
+                        system += "\n\nLIVE WEB DATA (use this, it is current):\n" + "\n".join(snippets)
+            except Exception as e:
+                logger.warning(f"Tavily search failed: {e}")
 
     messages = [{"role": "system", "content": system}] + history
 

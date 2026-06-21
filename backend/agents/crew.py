@@ -75,9 +75,9 @@ For price, use the estimated selling price from the research. If unclear, use "2
                     "Content-Type": "application/json",
                 },
                 json={
-                    "model": config.OPENROUTER_MODEL,
+                    "model": "meta-llama/llama-3.3-70b-instruct",
                     "messages": [{"role": "user", "content": prompt}],
-                    "max_tokens": 300,
+                    "max_tokens": 400,
                     "temperature": 0.2,
                 },
             )
