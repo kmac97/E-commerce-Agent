@@ -14,11 +14,11 @@ load_dotenv()
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
-# Primary model — Hermes 3 70B is excellent for agentic tool use
-OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "nousresearch/hermes-3-llama-3.1-70b")
+# Primary model — Llama 3.3 70B: Dec 2024 knowledge cutoff, strong instruction following
+OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "meta-llama/llama-3.3-70b-instruct")
 
-# Fallback model for simpler tasks (cheaper)
-OPENROUTER_FAST_MODEL = "mistralai/mistral-7b-instruct"
+# Fast model for simple extraction tasks
+OPENROUTER_FAST_MODEL = os.getenv("OPENROUTER_FAST_MODEL", "meta-llama/llama-3.1-8b-instruct")
 
 # Model settings
 MAX_TOKENS = 2000

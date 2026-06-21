@@ -250,30 +250,30 @@ async def chat_with_max(request: ChatRequest):
     import config as cfg
     from tgbot.commands import SYSTEM_PROMPT
 
-    realtime_triggers = [
-        "trend", "trending", "selling", "hot right now", "right now",
-        "currently", "today", "this week", "winning product", "best product",
-        "niche", "market", "demand", "popular", "viral", "opportunity",
-    ]
-    needs_realtime = any(t in request.message.lower() for t in realtime_triggers)
+    # Skip live search only for pure chit-chat — everything else benefits from real-time data
+    skip_search = ["hello", "hi ", "hey ", "thanks", "thank you", "bye", "how are you", "what's up", "sup"]
+    needs_realtime = not any(t in request.message.lower() for t in skip_search)
 
-    system = SYSTEM_PROMPT
+    from datetime import datetime
+    today = datetime.utcnow().strftime("%A, %d %B %Y")
+    system = SYSTEM_PROMPT + f"\n\nToday's date: {today}."
+
     if needs_realtime and cfg.TAVILY_API_KEY:
         try:
-            async with httpx.AsyncClient(timeout=10) as client:
+            async with httpx.AsyncClient(timeout=12) as client:
                 r = await client.post(
                     "https://api.tavily.com/search",
                     json={"api_key": cfg.TAVILY_API_KEY, "query": request.message,
-                          "search_depth": "basic", "max_results": 3, "include_answer": True},
+                          "search_depth": "advanced", "max_results": 5, "include_answer": True},
                 )
                 d = r.json()
                 snippets = []
                 if d.get("answer"):
                     snippets.append(d["answer"])
-                for result in d.get("results", [])[:2]:
-                    snippets.append(f"- {result.get('title', '')}: {result.get('content', '')[:200]}")
+                for result in d.get("results", [])[:4]:
+                    snippets.append(f"- {result.get('title', '')}: {result.get('content', '')[:300]}")
                 if snippets:
-                    system += "\n\nLIVE WEB DATA:\n" + "\n".join(snippets)
+                    system += "\n\nLIVE WEB DATA (use this, it is current):\n" + "\n".join(snippets)
         except Exception:
             pass
 
