@@ -5,7 +5,7 @@ const API_URL = window.API_URL || "https://e-comagent.duckdns.org";
 // Lookup caches so we never embed JSON in onclick attributes
 const _research = {};
 const _products = {};
-const _chatHistory = [];
+let _chatHistory = JSON.parse(localStorage.getItem("max_chat") || "[]");
 
 // Full data arrays for client-side search
 let _researchData = [];
@@ -1215,6 +1215,7 @@ async function sendChat() {
 
   appendChatMsg("user", msg);
   _chatHistory.push({ role: "user", content: msg });
+  saveChat();
 
   const typing = appendTyping();
 
@@ -1228,6 +1229,7 @@ async function sendChat() {
   const reply = data?.reply || "Sorry, I'm having trouble connecting right now.";
   appendChatMsg("assistant", reply);
   _chatHistory.push({ role: "assistant", content: reply });
+  saveChat();
 
   input.disabled = false;
   sendBtn.disabled = false;
@@ -1245,6 +1247,26 @@ function appendChatMsg(role, text) {
   div.innerHTML = `<div class="chat-bubble">${content}</div>`;
   msgs.appendChild(div);
   scrollChat();
+}
+
+// Persist Max's memory across refreshes/sessions (cap to last 40 to control size)
+function saveChat() {
+  _chatHistory = _chatHistory.slice(-40);
+  try { localStorage.setItem("max_chat", JSON.stringify(_chatHistory)); } catch (e) {}
+}
+
+function restoreChat() {
+  if (!_chatHistory.length) return;
+  const msgs = document.getElementById("chat-messages");
+  if (msgs) msgs.innerHTML = "";
+  _chatHistory.forEach(m => appendChatMsg(m.role, m.content));
+}
+
+function clearChat() {
+  _chatHistory = [];
+  try { localStorage.removeItem("max_chat"); } catch (e) {}
+  const msgs = document.getElementById("chat-messages");
+  if (msgs) msgs.innerHTML = '<div class="chat-msg assistant"><div class="chat-bubble">Fresh start. What are we working on?</div></div>';
 }
 
 function appendTyping() {
@@ -1334,6 +1356,7 @@ document.addEventListener("keydown", e => {
 
 checkStatus();
 loadDashboard();
+restoreChat();
 
 // Handle PWA shortcut deep-links (/?tab=research etc)
 const _urlTab = new URLSearchParams(location.search).get("tab");
