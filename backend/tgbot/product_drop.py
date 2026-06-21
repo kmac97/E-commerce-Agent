@@ -31,7 +31,7 @@ def format_drop(found: int, products: list, date_str: str) -> str:
         lines.append(f"*{i}. {name}*{score}")
         cost, sell, margin = p.get("cost_estimate"), p.get("sell_price_estimate"), p.get("margin_estimate")
         if cost and sell:
-            m = f" ({margin}% margin)" if margin else ""
+            m = f" ({margin:g}% margin)" if margin else ""
             lines.append(f"   💰 ${cost} → ${sell}{m}")
         if p.get("niche"):
             lines.append(f"   🏷 {p['niche']}")
