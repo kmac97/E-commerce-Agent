@@ -115,7 +115,12 @@ For price, use the estimated selling price from the research. If unclear, use "2
                 logger.error(f"Shopify draft creation failed: {res.status_code} {res.text}")
                 return None
             created = res.json().get("product", {})
-            return f"https://{config.SHOPIFY_SHOP_URL}/admin/products/{created['id']}"
+            product_id = created.get("id")
+            if not product_id:
+                logger.error("Shopify response missing product id")
+                return None
+            shop = config.SHOPIFY_SHOP_URL.replace("https://", "").replace("http://", "").rstrip("/")
+            return f"https://{shop}/admin/products/{product_id}"
 
     except Exception as e:
         logger.error(f"Shopify draft creation error: {e}")

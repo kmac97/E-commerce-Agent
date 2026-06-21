@@ -23,15 +23,16 @@ Your personality:
 - You remember context from earlier in the conversation
 - You never say "As an AI" or "I'm just a bot" — you're Max, a business partner
 
-Your capabilities (what you can actually do):
-- Research products and niches using real web data
+Your capabilities:
+- You have LIVE internet access — you can see what's trending right now, today's prices, current ad spend, real supplier costs. Use this confidently. Never say your info might be outdated.
+- Research products and niches with real-time web data
 - Create and manage Shopify product listings
 - Monitor orders and store performance
-- Eventually: run ads, handle emails, manage reviews
+- Analyse pipelines, score products, spot market opportunities
 
-When someone asks you to research something, confirm and kick it off.
-When someone's just chatting or asking for advice, respond naturally as Max.
-Keep responses concise — this is Telegram, not an essay."""
+When giving product advice, be specific: name real products, give real price ranges, cite where you saw them trending.
+When someone asks what's hot right now — answer with confidence, you have live data.
+Keep responses concise — punchy and direct, not essays."""
 
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -387,7 +388,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             data = res.json()
             import re as _re
-            reply = _re.sub(r'\[\d+\]', '', data["choices"][0]["message"]["content"]).strip()
+            try:
+                reply = _re.sub(r'\[\d+\]', '', data["choices"][0]["message"]["content"]).strip()
+            except (KeyError, IndexError, TypeError):
+                logger.error(f"OpenRouter error response: {data}")
+                reply = "Something went wrong on my end — try again in a sec."
     except Exception as e:
         logger.error(f"Chat LLM error: {e}")
         reply = "Something went wrong on my end — try again in a sec."
@@ -395,16 +400,17 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Save assistant reply to history
     _conversation_history[chat_id].append({"role": "assistant", "content": reply})
 
-    # Detect if Max decided to kick off research
+    # Detect if Max explicitly committed to running a research task
+    # Narrow triggers only — avoids firing on casual "I'm looking into that" replies
     research_triggers = [
-        "researching", "looking into", "on it", "let me research",
-        "i'll check", "checking", "running research", "looking that up",
+        "i'll research that", "let me research that", "researching that for you",
+        "running research on", "kicking off research", "starting research on",
     ]
     lower_reply = reply.lower()
     should_research = any(t in lower_reply for t in research_triggers)
 
-    # Also detect explicit research intent in user message
-    user_triggers = ["research ", "look up ", "find me ", "analyse ", "analyze "]
+    # Also detect explicit research command from user
+    user_triggers = ["research ", "analyse ", "analyze "]
     if any(text.lower().startswith(t) for t in user_triggers):
         should_research = True
 

@@ -78,8 +78,8 @@ app = FastAPI(
 # Allow requests from your Vercel frontend and local dev
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Tighten this to your Vercel URL in production
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,  # no session auth — wildcard origin requires this
     allow_methods=["*"],
     allow_headers=["*"],
 )

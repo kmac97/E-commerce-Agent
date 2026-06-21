@@ -38,7 +38,7 @@ async def get_research_item(research_id: str):
 async def update_research_item(research_id: str, body: ResearchUpdate):
     """Update research score or notes."""
     from database.client import update_research_fields
-    fields = {k: v for k, v in body.dict().items() if v is not None}
+    fields = {k: v for k, v in body.model_dump().items() if v is not None}
     if fields:
         await update_research_fields(research_id, fields)
     return {"status": "updated"}

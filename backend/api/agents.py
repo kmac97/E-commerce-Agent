@@ -206,7 +206,10 @@ async def find_products_agent():
         )
         ai = r.json()
 
-    raw = ai["choices"][0]["message"]["content"].strip()
+    try:
+        raw = ai["choices"][0]["message"]["content"].strip()
+    except (KeyError, IndexError, TypeError):
+        return {"error": "AI service unavailable — try again"}
     match = re.search(r"\[.*\]", raw, re.DOTALL)
     if not match:
         return {"error": "AI did not return a product list — try again"}
@@ -291,6 +294,10 @@ async def chat_with_max(request: ChatRequest):
         )
         data = res.json()
         import re as _re
-        reply = _re.sub(r'\[\d+\]', '', data["choices"][0]["message"]["content"]).strip()
+        try:
+            reply = _re.sub(r'\[\d+\]', '', data["choices"][0]["message"]["content"]).strip()
+        except (KeyError, IndexError, TypeError):
+            logger.error(f"OpenRouter error response: {data}")
+            reply = "I'm having trouble connecting right now — try again in a second."
 
     return {"reply": reply}

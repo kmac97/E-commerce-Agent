@@ -997,7 +997,7 @@ function pollTask(taskId, label) {
       showToast(`Research failed: "${label}"`, null, "error");
     }
   }, 5000);
-  setTimeout(() => clearInterval(interval), 600000); // 10min max
+  setTimeout(() => clearInterval(interval), 1800000); // 30min max
 }
 
 function closeFormModal() {

@@ -86,7 +86,7 @@ async def get_recent_tasks() -> list:
 
 async def build_briefing() -> str:
     """Assemble the full daily briefing message."""
-    today = datetime.now().strftime("%A, %d %b %Y")
+    today = datetime.now(timezone.utc).strftime("%A, %d %b %Y")
 
     orders, research, tasks = await asyncio.gather(
         get_orders_summary(),
