@@ -386,7 +386,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 },
             )
             data = res.json()
-            reply = data["choices"][0]["message"]["content"].strip()
+            import re as _re
+            reply = _re.sub(r'\[\d+\]', '', data["choices"][0]["message"]["content"]).strip()
     except Exception as e:
         logger.error(f"Chat LLM error: {e}")
         reply = "Something went wrong on my end — try again in a sec."

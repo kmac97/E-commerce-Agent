@@ -290,6 +290,7 @@ async def chat_with_max(request: ChatRequest):
             json={"model": cfg.OPENROUTER_MODEL, "messages": messages, "max_tokens": 700, "temperature": 0.85},
         )
         data = res.json()
-        reply = data["choices"][0]["message"]["content"].strip()
+        import re as _re
+        reply = _re.sub(r'\[\d+\]', '', data["choices"][0]["message"]["content"]).strip()
 
     return {"reply": reply}
