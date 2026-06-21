@@ -736,6 +736,7 @@ function openResearch(id) {
     <div class="modal-section-label">Research Output</div>
     ${body}
     ${adLinks(r.topic)}
+    ${trendsEmbed(r.topic)}
     <div class="modal-actions">
       <button class="btn-to-pipeline" onclick="researchToPipeline('${id}')">+ Add to Pipeline</button>
       <button class="btn-copy" onclick="copyResearch('${id}')">⎘ Copy</button>
@@ -813,6 +814,7 @@ function openProduct(id) {
     ${p.notes ? `<div class="modal-section-label">Notes</div><p class="modal-body">${p.notes}</p>` : ""}
     ${p.data ? `<div class="modal-section-label">Raw Data</div><pre>${JSON.stringify(p.data, null, 2)}</pre>` : ""}
     ${adLinks(p.name)}
+    ${trendsEmbed(p.name)}
     <div class="modal-actions">
       <button class="btn-edit" onclick="editProduct('${id}')">✎ Edit</button>
       <button class="btn-shopify" id="shopify-draft-btn" onclick="shopifyDraft('${id}')">→ Shopify Draft</button>
@@ -1140,10 +1142,21 @@ function adLinks(keyword) {
   const q = encodeURIComponent(keyword);
   return `<div class="ad-links">
     <span class="ad-links-label">Search ads:</span>
-    <a class="ad-link" href="https://www.facebook.com/ads/library/?q=${q}&search_type=keyword_unordered" target="_blank" rel="noopener">FB Ads</a>
+    <a class="ad-link" href="https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=ALL&q=${q}&search_type=keyword_unordered&media_type=all" target="_blank" rel="noopener">FB Ads</a>
     <a class="ad-link" href="https://ads.tiktok.com/business/creativecenter/inspiration/topads/pc/en?keyword=${q}" target="_blank" rel="noopener">TikTok</a>
     <a class="ad-link" href="https://www.google.com/search?q=${q}+buy+online" target="_blank" rel="noopener">Google</a>
   </div>`;
+}
+
+// Google Trends — embedded via Google's own widget (no dependency, no rate limit)
+function trendsEmbed(keyword) {
+  const req = { comparisonItem: [{ keyword, geo: "", time: "today 12-m" }], category: 0, property: "" };
+  const tz = new Date().getTimezoneOffset();
+  const src = `https://trends.google.com/trends/embed/explore/TIMESERIES?req=${encodeURIComponent(JSON.stringify(req))}&tz=${tz}`;
+  const full = `https://trends.google.com/trends/explore?date=today%2012-m&q=${encodeURIComponent(keyword)}`;
+  return `<div class="modal-section-label">📈 Search Interest (12 mo) — rising or dying?</div>
+    <iframe class="trends-frame" src="${src}" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+    <a class="trends-fallback" href="${full}" target="_blank" rel="noopener">Chart not loading? Open in Google Trends →</a>`;
 }
 
 // ─────────────────────────────────────────

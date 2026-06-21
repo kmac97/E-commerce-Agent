@@ -1122,6 +1122,18 @@ select.form-input { cursor: pointer; }
 }
 .ad-link:hover { color: var(--accent2); border-color: var(--border-lit); }
 
+/* ─── GOOGLE TRENDS EMBED ─── */
+.trends-frame {
+  width: 100%; height: 380px; margin-top: 8px;
+  border: 1px solid var(--border); border-radius: 12px;
+  background: #fff;
+}
+.trends-fallback {
+  display: inline-block; margin-top: 8px; font-size: 11.5px;
+  color: var(--muted); text-decoration: none;
+}
+.trends-fallback:hover { color: var(--accent2); }
+
 /* ─── SPY STORE ROW ─── */
 .spy-row { display: flex; align-items: center; margin-bottom: 12px; }
 .spy-results-header { font-size: 12px; color: var(--muted2); margin-bottom: 10px; }
