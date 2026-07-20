@@ -75,13 +75,13 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Allow requests from your Vercel frontend and local dev
+# Allow requests only from the dashboard's known origins (config.ALLOWED_ORIGINS)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,  # no session auth — wildcard origin requires this
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=config.ALLOWED_ORIGINS,
+    allow_credentials=False,  # no session auth — auth is the X-Api-Key header
+    allow_methods=["GET", "POST", "PATCH", "DELETE"],
+    allow_headers=["Content-Type", "X-Api-Key"],
 )
 
 # ─────────────────────────────────────────

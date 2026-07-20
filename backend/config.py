@@ -25,6 +25,23 @@ MAX_TOKENS = 2000
 TEMPERATURE = 0.7
 
 # ─────────────────────────────────────────
+# CORS
+# ─────────────────────────────────────────
+
+# Comma-separated list of origins allowed to call the API. Defaults to the
+# dashboard's known Vercel domains (production alias, team alias, git-main
+# alias). Add a local dev origin via .env (e.g. http://127.0.0.1:5500) if
+# you test the frontend locally.
+ALLOWED_ORIGINS = [
+    o.strip() for o in os.getenv(
+        "ALLOWED_ORIGINS",
+        "https://e-commerce-agent-mu.vercel.app,"
+        "https://e-commerce-agent-brighttoproofingos.vercel.app,"
+        "https://e-commerce-agent-git-main-brighttoproofingos.vercel.app",
+    ).split(",") if o.strip()
+]
+
+# ─────────────────────────────────────────
 # API AUTH
 # ─────────────────────────────────────────
 
