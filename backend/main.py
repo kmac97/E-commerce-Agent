@@ -15,7 +15,7 @@ import logging
 from contextlib import asynccontextmanager
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 import config
@@ -89,10 +89,13 @@ app.add_middleware(
 # ─────────────────────────────────────────
 
 from api import agents, research, dashboard  # noqa: E402
+from api.auth import require_api_key  # noqa: E402
 
-app.include_router(agents.router, prefix="/api/agents", tags=["Agents"])
-app.include_router(research.router, prefix="/api/research", tags=["Research"])
-app.include_router(dashboard.router, prefix="/api/dashboard", tags=["Dashboard"])
+_auth = [Depends(require_api_key)]
+
+app.include_router(agents.router, prefix="/api/agents", tags=["Agents"], dependencies=_auth)
+app.include_router(research.router, prefix="/api/research", tags=["Research"], dependencies=_auth)
+app.include_router(dashboard.router, prefix="/api/dashboard", tags=["Dashboard"], dependencies=_auth)
 
 
 @app.get("/")

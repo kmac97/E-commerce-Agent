@@ -25,6 +25,13 @@ MAX_TOKENS = 2000
 TEMPERATURE = 0.7
 
 # ─────────────────────────────────────────
+# API AUTH
+# ─────────────────────────────────────────
+
+# Shared secret the dashboard sends as X-Api-Key. Generate with: openssl rand -hex 32
+API_KEY = os.getenv("API_KEY")
+
+# ─────────────────────────────────────────
 # TELEGRAM
 # ─────────────────────────────────────────
 
@@ -99,6 +106,7 @@ def validate_config():
         "TELEGRAM_CHAT_ID": TELEGRAM_CHAT_ID,
         "SUPABASE_URL": SUPABASE_URL,
         "SUPABASE_KEY": SUPABASE_KEY,
+        "API_KEY": API_KEY,
     }
 
     optional = {
