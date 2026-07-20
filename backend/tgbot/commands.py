@@ -6,6 +6,8 @@ from telegram import Update
 from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
 
+from tgbot.auth import owner_only
+
 logger = logging.getLogger(__name__)
 
 # In-memory conversation history (per chat session)
@@ -35,6 +37,7 @@ When someone asks what's hot right now — answer with confidence, you have live
 Keep responses concise — punchy and direct, not essays."""
 
 
+@owner_only
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Sent when user types /start"""
     await update.message.reply_text(
@@ -50,6 +53,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
+@owner_only
 async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Full command list"""
     await update.message.reply_text(
@@ -75,6 +79,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
+@owner_only
 async def cmd_research(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Trigger a research task: /research [topic]"""
     if not context.args:
@@ -116,6 +121,7 @@ async def cmd_research(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
+@owner_only
 async def cmd_orders(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Show recent Shopify orders"""
     import config as cfg
@@ -135,6 +141,7 @@ async def cmd_orders(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"Error fetching orders: {str(e)[:200]}")
 
 
+@owner_only
 async def cmd_store(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Show store product listings"""
     import config as cfg
@@ -157,6 +164,7 @@ async def cmd_store(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"Error fetching store: {str(e)[:200]}")
 
 
+@owner_only
 async def cmd_products(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Show the product pipeline"""
     from database.client import supabase
@@ -182,6 +190,7 @@ async def cmd_products(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("\n".join(lines), parse_mode=ParseMode.MARKDOWN)
 
 
+@owner_only
 async def cmd_tasks(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Show recent agent tasks"""
     from database.client import supabase
@@ -204,6 +213,7 @@ async def cmd_tasks(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("\n".join(lines), parse_mode=ParseMode.MARKDOWN)
 
 
+@owner_only
 async def cmd_trending(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Find trending products right now."""
     await update.message.reply_text(
@@ -220,6 +230,7 @@ async def cmd_trending(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"Error: {str(e)[:200]}")
 
 
+@owner_only
 async def cmd_inventory(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Check for low stock items."""
     await update.message.reply_text("🔍 Checking inventory...")
@@ -234,6 +245,7 @@ async def cmd_inventory(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"Error: {str(e)[:200]}")
 
 
+@owner_only
 async def cmd_prices(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Get price monitoring suggestions."""
     await update.message.reply_text("💰 Checking competitor prices, give me a moment...")
@@ -248,6 +260,7 @@ async def cmd_prices(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"Error: {str(e)[:200]}")
 
 
+@owner_only
 async def cmd_optimise(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Optimise a product listing: /optimise [product_id]"""
     if not context.args:
@@ -280,6 +293,7 @@ async def cmd_optimise(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"Error: {str(e)[:200]}")
 
 
+@owner_only
 async def cmd_briefing(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Trigger the daily briefing on demand."""
     await update.message.reply_text("📊 Generating your briefing...")
@@ -291,6 +305,7 @@ async def cmd_briefing(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"Error generating briefing: {str(e)[:200]}")
 
 
+@owner_only
 async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """System health check"""
     import config as cfg
@@ -315,6 +330,7 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("\n".join(lines), parse_mode=ParseMode.MARKDOWN)
 
 
+@owner_only
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Handle plain text messages with personality and memory.
