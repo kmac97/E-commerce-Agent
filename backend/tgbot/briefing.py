@@ -148,7 +148,7 @@ async def get_max_tip(context: str) -> str:
                     "Content-Type": "application/json",
                 },
                 json={
-                    "model": "meta-llama/llama-3.3-70b-instruct",
+                    "model": config.OPENROUTER_FAST_MODEL,
                     "messages": [
                         {
                             "role": "system",

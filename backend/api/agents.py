@@ -198,7 +198,7 @@ async def find_products_agent():
             "https://openrouter.ai/api/v1/chat/completions",
             headers={"Authorization": f"Bearer {cfg.OPENROUTER_API_KEY}", "Content-Type": "application/json"},
             json={
-                "model": "meta-llama/llama-3.3-70b-instruct",
+                "model": cfg.OPENROUTER_FAST_MODEL,
                 "messages": [
                     {
                         "role": "system",

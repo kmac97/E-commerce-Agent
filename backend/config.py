@@ -14,11 +14,16 @@ load_dotenv()
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
-# Primary model — Perplexity Sonar Pro: built-in live internet search, always current
-OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "perplexity/sonar-pro")
+# Primary model — Claude Haiku 4.5 via OpenRouter (anthropic/claude-haiku-4.5).
+# Reached through the existing OpenRouter integration, not the Anthropic SDK directly --
+# no new dependency or endpoint, just a different model string on the same API.
+OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "anthropic/claude-haiku-4.5")
 
-# Fast model for extraction tasks (no live search needed)
-OPENROUTER_FAST_MODEL = os.getenv("OPENROUTER_FAST_MODEL", "meta-llama/llama-3.1-8b-instruct")
+# Fast model for extraction/classification tasks. Same model as above for now --
+# Haiku 4.5 already is Anthropic's fast/cheap tier. Kept as a separate knob so a
+# heavier model (e.g. Claude Sonnet 5, also available via OpenRouter) can be split
+# onto OPENROUTER_MODEL later without touching the extraction call sites.
+OPENROUTER_FAST_MODEL = os.getenv("OPENROUTER_FAST_MODEL", "anthropic/claude-haiku-4.5")
 
 # Model settings
 MAX_TOKENS = 2000
