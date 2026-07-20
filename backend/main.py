@@ -88,12 +88,11 @@ app.add_middleware(
 # ROUTES
 # ─────────────────────────────────────────
 
-from api import agents, research, dashboard, shopify_auth  # noqa: E402
+from api import agents, research, dashboard  # noqa: E402
 
 app.include_router(agents.router, prefix="/api/agents", tags=["Agents"])
 app.include_router(research.router, prefix="/api/research", tags=["Research"])
 app.include_router(dashboard.router, prefix="/api/dashboard", tags=["Dashboard"])
-app.include_router(shopify_auth.router, tags=["Shopify Auth"])
 
 
 @app.get("/")
