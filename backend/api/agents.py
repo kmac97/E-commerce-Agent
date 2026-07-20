@@ -1,11 +1,15 @@
 # api/agents.py
 # Endpoints to trigger agents from the web dashboard or external calls.
 
+import logging
+
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from pydantic import BaseModel
 
 from agents.crew import run_research_task
 from api.rate_limit import limiter
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
