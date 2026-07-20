@@ -17,11 +17,15 @@ from contextlib import asynccontextmanager
 import uvicorn
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 import config
 from config import validate_config
 from database.client import init_db
 from tgbot.bot import start_telegram_bot
+from api.rate_limit import limiter
 
 # ─────────────────────────────────────────
 # LOGGING
@@ -83,6 +87,11 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PATCH", "DELETE"],
     allow_headers=["Content-Type", "X-Api-Key"],
 )
+
+# Rate limiting on expensive/externally-costed endpoints (see api/agents.py, api/dashboard.py)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 # ─────────────────────────────────────────
 # ROUTES

@@ -1,10 +1,11 @@
 # api/agents.py
 # Endpoints to trigger agents from the web dashboard or external calls.
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from pydantic import BaseModel
 
 from agents.crew import run_research_task
+from api.rate_limit import limiter
 
 router = APIRouter()
 
@@ -21,7 +22,8 @@ class TaskResponse(BaseModel):
 
 
 @router.post("/research", response_model=TaskResponse)
-async def trigger_research(request: ResearchRequest, background_tasks: BackgroundTasks):
+@limiter.limit("10/hour")
+async def trigger_research(request: Request, body: ResearchRequest, background_tasks: BackgroundTasks):
     """
     Trigger the research agent to investigate a product or niche.
     Runs in the background — results saved to Supabase and sent via Telegram.
@@ -32,14 +34,14 @@ async def trigger_research(request: ResearchRequest, background_tasks: Backgroun
     background_tasks.add_task(
         run_research_task,
         task_id=task_id,
-        topic=request.topic,
-        research_type=request.type,
+        topic=body.topic,
+        research_type=body.type,
     )
 
     return TaskResponse(
         task_id=task_id,
         status="started",
-        message=f"Research started for '{request.topic}'. You'll get a Telegram notification when done.",
+        message=f"Research started for '{body.topic}'. You'll get a Telegram notification when done.",
     )
 
 
@@ -59,7 +61,8 @@ class ChatRequest(BaseModel):
 
 
 @router.post("/import-product")
-async def import_product_from_url(body: dict):
+@limiter.limit("10/hour")
+async def import_product_from_url(request: Request, body: dict):
     """Fetch a product URL and extract structured product data using AI."""
     import httpx, json, re
     import config as cfg
@@ -101,7 +104,8 @@ async def import_product_from_url(body: dict):
 
 
 @router.get("/spy-store")
-async def spy_competitor_store(url: str):
+@limiter.limit("10/hour")
+async def spy_competitor_store(request: Request, url: str):
     """Fetch the public product catalogue of any Shopify store."""
     import httpx, re
 
@@ -128,11 +132,14 @@ async def spy_competitor_store(url: str):
         return {"error": str(e)}
 
 
-@router.post("/find-products")
 async def find_products_agent():
     """
     Search the web for real trending products and add them to the pipeline.
     Runs 4 parallel Tavily searches then uses AI to extract specific named products with prices.
+
+    Not decorated with the route/rate-limit here -- tgbot/product_drop.py calls
+    this function directly in-process for the daily cron drop, bypassing HTTP
+    entirely. The rate limit only applies to the HTTP route below.
     """
     import asyncio, json, re
     import httpx
@@ -246,8 +253,16 @@ async def find_products_agent():
     return {"found": len(saved), "products": saved}
 
 
+@router.post("/find-products")
+@limiter.limit("5/hour")
+async def find_products_route(request: Request):
+    """HTTP route for the dashboard's Find button -- rate-limited, unlike the cron path above."""
+    return await find_products_agent()
+
+
 @router.post("/chat")
-async def chat_with_max(request: ChatRequest):
+@limiter.limit("20/minute")
+async def chat_with_max(request: Request, body: ChatRequest):
     """Send a message to Max and get a response."""
     import httpx
     import config as cfg
@@ -262,13 +277,13 @@ async def chat_with_max(request: ChatRequest):
 
     if not is_online_model and cfg.TAVILY_API_KEY:
         skip_search = ["hello", "hi ", "hey ", "thanks", "thank you", "bye", "how are you"]
-        needs_realtime = not any(t in request.message.lower() for t in skip_search)
+        needs_realtime = not any(t in body.message.lower() for t in skip_search)
         if needs_realtime:
             try:
                 async with httpx.AsyncClient(timeout=12) as client:
                     r = await client.post(
                         "https://api.tavily.com/search",
-                        json={"api_key": cfg.TAVILY_API_KEY, "query": request.message,
+                        json={"api_key": cfg.TAVILY_API_KEY, "query": body.message,
                               "search_depth": "advanced", "max_results": 5, "include_answer": True},
                     )
                     d = r.json()
@@ -283,8 +298,8 @@ async def chat_with_max(request: ChatRequest):
                 pass
 
     messages = [{"role": "system", "content": system}]
-    messages += request.history[-20:]
-    messages.append({"role": "user", "content": request.message})
+    messages += body.history[-20:]
+    messages.append({"role": "user", "content": body.message})
 
     async with httpx.AsyncClient(timeout=45) as client:
         res = await client.post(

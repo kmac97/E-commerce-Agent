@@ -22,3 +22,4 @@ tavily-python>=0.3.0
 # Utilities
 pydantic>=2.5.0
 python-multipart>=0.0.9
+slowapi>=0.1.9

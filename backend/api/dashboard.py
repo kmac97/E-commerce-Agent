@@ -1,9 +1,11 @@
 # api/dashboard.py
 # Endpoints that power the web dashboard.
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from pydantic import BaseModel
 from typing import Optional
+
+from api.rate_limit import limiter
 
 router = APIRouter()
 
@@ -123,7 +125,8 @@ async def delete_product_item(product_id: str):
 
 
 @router.post("/products/{product_id}/shopify-draft")
-async def create_shopify_draft(product_id: str):
+@limiter.limit("20/hour")
+async def create_shopify_draft(request: Request, product_id: str):
     """Push a product to Shopify as a draft listing."""
     import httpx
     import config
@@ -164,7 +167,8 @@ async def create_shopify_draft(product_id: str):
 
 
 @router.get("/briefing")
-async def get_briefing():
+@limiter.limit("10/hour")
+async def get_briefing(request: Request):
     """Return today's briefing data as structured JSON."""
     import asyncio
     from datetime import datetime
@@ -194,7 +198,8 @@ async def get_briefing():
 
 
 @router.get("/revenue")
-async def get_revenue(days: int = 30):
+@limiter.limit("30/hour")
+async def get_revenue(request: Request, days: int = 30):
     """Daily revenue from Shopify for the last N days."""
     import httpx
     import config
