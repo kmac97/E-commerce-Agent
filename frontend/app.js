@@ -2,6 +2,15 @@
 
 const API_URL = window.API_URL || "https://e-comagent.duckdns.org";
 
+// Dashboard API key — prompted once, persisted in localStorage, sent as X-Api-Key.
+let _apiKey = localStorage.getItem("api_key") || "";
+function promptApiKey() {
+  const k = window.prompt("Enter dashboard API key:");
+  if (k) { _apiKey = k; localStorage.setItem("api_key", k); }
+  return k;
+}
+if (!_apiKey) promptApiKey();
+
 // Lookup caches so we never embed JSON in onclick attributes
 const _research = {};
 const _products = {};
@@ -35,14 +44,19 @@ function savePin(type) {
 // API
 // ─────────────────────────────────────────
 
-async function apiFetch(path, method = "GET", body = null) {
+async function apiFetch(path, method = "GET", body = null, _retried = false) {
   try {
-    const opts = { method };
+    const opts = { method, headers: { "X-Api-Key": _apiKey } };
     if (body) {
-      opts.headers = { "Content-Type": "application/json" };
+      opts.headers["Content-Type"] = "application/json";
       opts.body = JSON.stringify(body);
     }
     const res = await fetch(`${API_URL}${path}`, opts);
+    if (res.status === 401 && !_retried) {
+      localStorage.removeItem("api_key");
+      _apiKey = "";
+      if (promptApiKey()) return apiFetch(path, method, body, true);
+    }
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return await res.json();
   } catch (e) {
