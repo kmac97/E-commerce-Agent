@@ -95,7 +95,7 @@ function showToast(msg, undoFn = null, type = "success") {
   document.querySelectorAll(".toast").forEach(t => t.remove());
   const t = document.createElement("div");
   t.className = `toast toast-${type}`;
-  t.innerHTML = `<span>${msg}</span>${undoFn ? '<button class="toast-undo">Undo</button>' : ""}`;
+  t.innerHTML = `<span>${escHtml(msg)}</span>${undoFn ? '<button class="toast-undo">Undo</button>' : ""}`;
   document.body.appendChild(t);
   if (undoFn) {
     t.querySelector(".toast-undo").addEventListener("click", () => { undoFn(); t.remove(); });
@@ -160,7 +160,15 @@ function updateTabMetas() {
 }
 
 function badge(type, text) {
-  return `<span class="badge badge-${type}">${text}</span>`;
+  return `<span class="badge badge-${escHtml(type)}">${escHtml(text)}</span>`;
+}
+
+const VALID_STATUSES = ["idea", "researching", "testing", "active", "dropped"];
+function safeStatus(status) {
+  // product.status has no server-side enum check -- clamp to the known set
+  // rather than escaping, since it's also embedded in a single-quoted JS
+  // string inside an onclick attribute (a context escHtml doesn't cover).
+  return VALID_STATUSES.includes(status) ? status : "idea";
 }
 
 function scoreEl(score) {
@@ -253,7 +261,9 @@ function escHtml(s) {
 }
 
 function inlineMd(text) {
-  return text
+  // Escape first, THEN apply markdown -- so AI/research text can never
+  // inject real tags, only ever the handful this function itself emits.
+  return escHtml(text)
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.+?)\*/g, '<em>$1</em>')
     .replace(/`(.+?)`/g, '<code class="md-code">$1</code>');
@@ -463,10 +473,10 @@ async function loadDashboard(full = true) {
     tasksEl.innerHTML = data.recent_tasks.slice(0, 5).map(t => `
       <div class="card">
         <div class="card-header">
-          <div class="card-title">${t.task || t.agent}</div>
+          <div class="card-title">${escHtml(t.task || t.agent)}</div>
           ${badge(t.status, t.status)}
         </div>
-        <div class="card-meta">${t.agent} · ${timeAgo(t.created_at)}</div>
+        <div class="card-meta">${escHtml(t.agent)} · ${timeAgo(t.created_at)}</div>
       </div>
     `).join("");
   }
@@ -479,7 +489,7 @@ async function loadDashboard(full = true) {
     researchEl.innerHTML = data.recent_research.slice(0, 5).map(r => `
       <div class="card" onclick="openResearch('${r.id}')">
         <div class="card-header">
-          <div class="card-title">${r.topic}</div>
+          <div class="card-title">${escHtml(r.topic)}</div>
           <div style="display:flex;gap:6px;align-items:center">
             ${r.score ? scoreEl(r.score) : ""}
             ${badge(r.type, r.type)}
@@ -536,7 +546,7 @@ function renderResearch() {
     el.innerHTML = _researchScore7
       ? `<div class="empty">No research with score 7+ yet.</div>`
       : query
-        ? `<div class="empty">No results for "${query}".</div>`
+        ? `<div class="empty">No results for "${escHtml(query)}".</div>`
         : `<div class="empty-cta"><div class="empty-cta-icon">🔬</div><div class="empty-cta-text">No research saved yet</div><button class="empty-cta-btn" onclick="showAddResearch()">+ Start Research</button></div>`;
     return;
   }
@@ -550,7 +560,7 @@ function renderResearch() {
     return `
     <div class="card" onclick="openResearch('${r.id}')">
       <div class="card-header">
-        <div class="card-title">${r.topic}</div>
+        <div class="card-title">${escHtml(r.topic)}</div>
         <div style="display:flex;gap:6px;align-items:center">
           ${scoreHtml}
           ${badge(r.type, r.type)}
@@ -559,7 +569,7 @@ function renderResearch() {
         </div>
       </div>
       <div class="card-meta">${timeAgo(r.created_at)}</div>
-      ${r.notes ? `<div class="card-snippet">${r.notes}</div>` : ""}
+      ${r.notes ? `<div class="card-snippet">${escHtml(r.notes)}</div>` : ""}
     </div>`;
   }).join("");
 }
@@ -612,10 +622,10 @@ function renderKanban() {
                  ondragstart="handleKanbanDragStart(event,'${p.id}')"
                  ondragend="this.classList.remove('dragging')"
                  onclick="openProduct('${p.id}')">
-              <div class="kanban-card-title">${p.name}</div>
+              <div class="kanban-card-title">${escHtml(p.name)}</div>
               <div class="kanban-card-meta">
                 ${p.score ? scoreEl(p.score) : ""}
-                ${p.niche ? `<span>${p.niche}</span>` : ""}
+                ${p.niche ? `<span>${escHtml(p.niche)}</span>` : ""}
               </div>
             </div>`).join("")}
         </div>
@@ -672,7 +682,7 @@ function renderProducts() {
     el.innerHTML = _productsScore7
       ? `<div class="empty">No products with score 7+ yet.</div>`
       : query
-        ? `<div class="empty">No results for "${query}".</div>`
+        ? `<div class="empty">No results for "${escHtml(query)}".</div>`
         : `<div class="empty-cta"><div class="empty-cta-icon">📦</div><div class="empty-cta-text">No products in pipeline yet</div><button class="empty-cta-btn" onclick="showAddProduct()">+ Add Product</button></div>`;
     return;
   }
@@ -686,17 +696,17 @@ function renderProducts() {
     return `
     <div class="card" onclick="openProduct('${p.id}')">
       <div class="card-header">
-        <div class="card-title">${p.name}</div>
+        <div class="card-title">${escHtml(p.name)}</div>
         <div style="display:flex;gap:6px;align-items:center">
           ${scoreHtml}
-          <span class="badge badge-${p.status || 'idea'}" onclick="event.stopPropagation();editStatus('${p.id}','${p.status || 'idea'}',this)">${p.status || "idea"}</span>
+          <span class="badge badge-${safeStatus(p.status)}" onclick="event.stopPropagation();editStatus('${p.id}','${safeStatus(p.status)}',this)">${safeStatus(p.status)}</span>
           ${pinBtn("products", p.id)}
           ${deleteBtn(`deleteProduct('${p.id}',this)`)}
         </div>
       </div>
-      ${p.niche ? `<div class="card-meta">Niche: ${p.niche}</div>` : ""}
+      ${p.niche ? `<div class="card-meta">Niche: ${escHtml(p.niche)}</div>` : ""}
       ${p.margin_estimate ? `<div class="card-meta">Est. margin: ${p.margin_estimate}%</div>` : ""}
-      ${p.notes ? `<div class="card-snippet">${p.notes}</div>` : ""}
+      ${p.notes ? `<div class="card-snippet">${escHtml(p.notes)}</div>` : ""}
     </div>`;
   }).join("");
 }
@@ -719,13 +729,13 @@ async function loadTasks() {
   el.innerHTML = data.map(t => `
     <div class="card">
       <div class="card-header">
-        <div class="card-title">${t.task}</div>
+        <div class="card-title">${escHtml(t.task)}</div>
         ${badge(t.status, t.status)}
       </div>
-      <div class="card-meta">${t.agent} · ${timeAgo(t.created_at)}
+      <div class="card-meta">${escHtml(t.agent)} · ${timeAgo(t.created_at)}
         ${t.duration_seconds ? ` · ${t.duration_seconds}s` : ""}
       </div>
-      ${t.error ? `<div class="card-snippet" style="color:#fca5a5">${t.error}</div>` : ""}
+      ${t.error ? `<div class="card-snippet" style="color:#fca5a5">${escHtml(t.error)}</div>` : ""}
       ${t.status === "running" ? `<div class="task-running-bar"></div>` : ""}
     </div>
   `).join("");
@@ -742,11 +752,11 @@ function openResearch(id) {
   const raw = r.data?.raw_output;
   const body = raw
     ? `<div class="md-body">${renderMarkdown(raw)}</div>`
-    : `<pre>${JSON.stringify(r.data || {}, null, 2)}</pre>`;
+    : `<pre>${escHtml(JSON.stringify(r.data || {}, null, 2))}</pre>`;
   document.getElementById("modal-content").innerHTML = `
-    <h2>${r.topic}</h2>
+    <h2>${escHtml(r.topic)}</h2>
     <div class="modal-badges">${badge(r.type, r.type)} ${r.score ? scoreEl(r.score) : ""}</div>
-    ${r.notes ? `<div class="modal-section-label">Notes</div><p class="modal-body">${r.notes}</p>` : ""}
+    ${r.notes ? `<div class="modal-section-label">Notes</div><p class="modal-body">${escHtml(r.notes)}</p>` : ""}
     <div class="modal-section-label">Research Output</div>
     ${body}
     ${adLinks(r.topic)}
@@ -815,18 +825,18 @@ function openProduct(id) {
     <div class="modal-meta">
       ${metaItems.map(m => `
         <div class="modal-meta-item">
-          <span class="modal-meta-key">${m.key}</span>
-          <span class="modal-meta-val">${m.val}</span>
+          <span class="modal-meta-key">${escHtml(m.key)}</span>
+          <span class="modal-meta-val">${escHtml(m.val)}</span>
         </div>
       `).join("")}
     </div>
   ` : "";
   document.getElementById("modal-content").innerHTML = `
-    <h2>${p.name}</h2>
-    <div class="modal-badges">${badge(p.status || "idea", p.status || "idea")} ${p.score ? scoreEl(p.score) : ""}</div>
+    <h2>${escHtml(p.name)}</h2>
+    <div class="modal-badges">${badge(safeStatus(p.status), safeStatus(p.status))} ${p.score ? scoreEl(p.score) : ""}</div>
     ${metaHtml}
-    ${p.notes ? `<div class="modal-section-label">Notes</div><p class="modal-body">${p.notes}</p>` : ""}
-    ${p.data ? `<div class="modal-section-label">Raw Data</div><pre>${JSON.stringify(p.data, null, 2)}</pre>` : ""}
+    ${p.notes ? `<div class="modal-section-label">Notes</div><p class="modal-body">${escHtml(p.notes)}</p>` : ""}
+    ${p.data ? `<div class="modal-section-label">Raw Data</div><pre>${escHtml(JSON.stringify(p.data, null, 2))}</pre>` : ""}
     ${adLinks(p.name)}
     ${trendsEmbed(p.name)}
     <div class="modal-actions">
@@ -918,11 +928,11 @@ function showAddProduct(prefill = {}) {
     <h2 style="margin-bottom:18px;font-size:17px;font-weight:700;letter-spacing:-0.02em">Add Product</h2>
     <div class="form-group">
       <label class="form-label">Name *</label>
-      <input class="form-input" id="f-name" placeholder="e.g. Bamboo phone case" value="${prefill.name || ''}" />
+      <input class="form-input" id="f-name" placeholder="e.g. Bamboo phone case" value="${escHtml(prefill.name || '')}" />
     </div>
     <div class="form-group">
       <label class="form-label">Niche</label>
-      <input class="form-input" id="f-niche" placeholder="e.g. Eco-friendly accessories" value="${prefill.niche || ''}" />
+      <input class="form-input" id="f-niche" placeholder="e.g. Eco-friendly accessories" value="${escHtml(prefill.niche || '')}" />
     </div>
     <div class="form-group">
       <label class="form-label">Score (1–10)</label>
@@ -930,7 +940,7 @@ function showAddProduct(prefill = {}) {
     </div>
     <div class="form-group">
       <label class="form-label">Notes</label>
-      <textarea class="form-input" id="f-notes" rows="3" placeholder="Initial thoughts...">${prefill.notes || ''}</textarea>
+      <textarea class="form-input" id="f-notes" rows="3" placeholder="Initial thoughts...">${escHtml(prefill.notes || '')}</textarea>
     </div>
     <button class="form-submit" onclick="submitAddProduct()">Add to Pipeline</button>
   `;
@@ -1134,17 +1144,17 @@ async function spyStore() {
   el.innerHTML = '<div class="loading">Fetching store catalogue</div>';
   const res = await apiFetch(`/api/agents/spy-store?url=${encodeURIComponent(url)}`);
   if (!res || res.error) {
-    el.innerHTML = `<div class="empty">${res?.error || "Could not reach store"}</div>`; return;
+    el.innerHTML = `<div class="empty">${escHtml(res?.error || "Could not reach store")}</div>`; return;
   }
-  el.innerHTML = `<div class="spy-results-header">${res.count} products found at ${res.domain}</div>` +
+  el.innerHTML = `<div class="spy-results-header">${res.count} products found at ${escHtml(res.domain)}</div>` +
     res.products.map(p => `
       <div class="card" style="cursor:default">
         <div class="card-header">
-          <div class="card-title">${p.title}</div>
+          <div class="card-title">${escHtml(p.title)}</div>
           ${p.price ? `<span class="score score-mid">$${p.price}</span>` : ""}
         </div>
-        <div class="card-meta">${[p.type, p.published].filter(Boolean).join(" · ")}</div>
-        <button class="empty-cta-btn" style="margin-top:8px;font-size:11.5px" onclick="showAddProduct({name:${JSON.stringify(p.title)},niche:${JSON.stringify(p.type)}})">+ Add to Pipeline</button>
+        <div class="card-meta">${escHtml([p.type, p.published].filter(Boolean).join(" · "))}</div>
+        <button class="empty-cta-btn" style="margin-top:8px;font-size:11.5px" onclick="showAddProduct({name:${escHtml(JSON.stringify(p.title))},niche:${escHtml(JSON.stringify(p.type))}})">+ Add to Pipeline</button>
       </div>`).join("");
 }
 
@@ -1257,7 +1267,7 @@ function appendChatMsg(role, text) {
   div.className = `chat-msg ${role}`;
   const content = role === "assistant"
     ? renderMarkdown(text)
-    : text.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/\n/g,"<br>");
+    : escHtml(text).replace(/\n/g,"<br>");
   div.innerHTML = `<div class="chat-bubble">${content}</div>`;
   msgs.appendChild(div);
   scrollChat();
