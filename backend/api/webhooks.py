@@ -25,6 +25,17 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 LOW_STOCK_THRESHOLD = 10
+MAX_BODY_BYTES = 1_000_000  # Shopify payloads are small; reject anything else upfront
+
+
+def _content_length_ok(request: Request) -> bool:
+    content_length = request.headers.get("content-length")
+    if content_length is None:
+        return True
+    try:
+        return int(content_length) <= MAX_BODY_BYTES
+    except ValueError:
+        return False
 
 
 def _verify_hmac(raw_body: bytes, header_value) -> bool:
@@ -43,6 +54,8 @@ def _verify_hmac(raw_body: bytes, header_value) -> bool:
 async def orders_webhook(request: Request):
     """orders/create -- Shopify's payload is flat REST-shaped JSON regardless
     of API version, so no GraphQL mapping is needed here."""
+    if not _content_length_ok(request):
+        return Response(status_code=413)
     raw = await request.body()
     if not _verify_hmac(raw, request.headers.get("x-shopify-hmac-sha256")):
         return Response(status_code=401)
@@ -61,6 +74,8 @@ async def orders_webhook(request: Request):
 async def inventory_webhook(request: Request):
     """inventory_levels/update -- payload only carries inventory_item_id, so
     resolve it to a product/variant title via GraphQL before alerting."""
+    if not _content_length_ok(request):
+        return Response(status_code=413)
     raw = await request.body()
     if not _verify_hmac(raw, request.headers.get("x-shopify-hmac-sha256")):
         return Response(status_code=401)

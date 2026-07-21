@@ -24,7 +24,7 @@ from slowapi.middleware import SlowAPIMiddleware
 import config
 from config import validate_config
 from database.client import init_db
-from tgbot.bot import start_telegram_bot
+from tgbot.bot import start_telegram_bot, stop_telegram_bot
 from api.rate_limit import limiter
 
 # ─────────────────────────────────────────
@@ -56,14 +56,14 @@ async def lifespan(app: FastAPI):
     logger.info("✅ Supabase connected")
 
     # Start Telegram bot in background
-    asyncio.create_task(start_telegram_bot())
+    bot_task = asyncio.create_task(start_telegram_bot())
     logger.info("✅ Telegram bot started")
 
     # Start the durable job worker (imports agents.crew first so its
     # research_task handler is registered before the loop starts polling)
     import agents.crew  # noqa: F401
     from agents.job_worker import run_worker_loop
-    asyncio.create_task(run_worker_loop())
+    worker_task = asyncio.create_task(run_worker_loop())
     logger.info("✅ Job worker started")
 
     logger.info(f"✅ FastAPI running on http://{config.API_HOST}:{config.API_PORT}")
@@ -71,8 +71,26 @@ async def lifespan(app: FastAPI):
 
     yield  # App runs here
 
-    # Shutdown
+    # Shutdown -- stop the bot's own polling (start_polling() runs its own
+    # internal tasks, separate from bot_task, which already completed right
+    # after startup) and cancel the worker's long-running loop, so a PM2
+    # restart doesn't leave either running against a torn-down event loop.
     logger.info("👋 Shutting down...")
+
+    await stop_telegram_bot()
+
+    worker_task.cancel()
+    try:
+        await worker_task
+    except asyncio.CancelledError:
+        pass
+
+    if not bot_task.done():
+        bot_task.cancel()
+        try:
+            await bot_task
+        except asyncio.CancelledError:
+            pass
 
 
 # ─────────────────────────────────────────

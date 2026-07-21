@@ -30,6 +30,13 @@ logger = logging.getLogger(__name__)
 # Global bot instance for sending messages from agents
 _bot: Bot = None
 
+# The running Application -- start_polling() is non-blocking, so the task
+# started via asyncio.create_task(start_telegram_bot()) in main.py completes
+# right after polling starts. The actual polling lives inside this object's
+# own internal tasks, so a clean shutdown needs a reference to it, not just
+# that task handle.
+_app: Application = None
+
 
 async def send_telegram_message(text: str, parse_mode: str = ParseMode.MARKDOWN):
     """
@@ -68,10 +75,11 @@ async def start_telegram_bot():
         logger.warning("TELEGRAM_BOT_TOKEN not set — bot disabled")
         return
 
-    global _bot
+    global _bot, _app
 
     app = Application.builder().token(config.TELEGRAM_BOT_TOKEN).build()
     _bot = app.bot
+    _app = app
 
     # Register command handlers
     app.add_handler(CommandHandler("start", cmd_start))
@@ -100,3 +108,21 @@ async def start_telegram_bot():
     await app.initialize()
     await app.start()
     await app.updater.start_polling(drop_pending_updates=True)
+
+
+async def stop_telegram_bot():
+    """Cleanly stop polling on app shutdown (see main.py's lifespan). Safe
+    to call even if the bot was never started (no token, or start failed)."""
+    global _app
+    if not _app:
+        return
+    try:
+        if _app.updater and _app.updater.running:
+            await _app.updater.stop()
+        if _app.running:
+            await _app.stop()
+        await _app.shutdown()
+    except Exception as e:
+        logger.warning(f"Error stopping Telegram bot cleanly: {e}")
+    finally:
+        _app = None

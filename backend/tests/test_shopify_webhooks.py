@@ -116,6 +116,15 @@ def test_inventory_webhook_falls_back_when_lookup_fails():
     _lookup_result["raise_error"] = False
 
 
+def test_oversized_body_rejected_before_hmac_check():
+    body = json.dumps({"name": "#1003", "total_price": "1.00", "currency": "USD"}).encode()
+    headers = _signed_headers(body)
+    headers["content-length"] = str(webhooks.MAX_BODY_BYTES + 1)
+    r = client.post("/webhooks/shopify/orders", content=body, headers=headers)
+    assert r.status_code == 413
+    assert _sent_messages == []
+
+
 def test_missing_secret_rejects_everything():
     original = config.SHOPIFY_WEBHOOK_SECRET
     config.SHOPIFY_WEBHOOK_SECRET = None
