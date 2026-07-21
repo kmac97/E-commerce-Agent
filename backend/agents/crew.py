@@ -14,7 +14,7 @@ from agents.store_manager import create_store_manager_agent
 from agents.marketer import create_marketer_agent
 from agents.support_agent import create_support_agent
 from agents.analyst import create_analyst_agent
-from database.client import save_task_log, update_task_log, save_research
+from database.client import save_task_log, update_task_log, save_research, create_action
 from tgbot.bot import send_telegram_message
 import config
 
@@ -39,15 +39,19 @@ def _extract_score(text: str) -> int:
     return 0
 
 
-async def _auto_create_shopify_draft(topic: str, research_text: str) -> str | None:
+async def _propose_shopify_draft(task_id: str, topic: str, research_text: str) -> dict | None:
     """
-    Use GPT to extract product details from research, then create a Shopify draft.
-    Returns the Shopify admin URL on success, None on failure.
+    Use the LLM to extract product listing details from research, then propose
+    a Shopify draft as an `actions` row awaiting Telegram approval -- does NOT
+    write to Shopify directly (see tgbot/approvals.py, which executes it once
+    approved). Returns the created action dict, or None if extraction/proposal
+    failed. Never raises: a proposal failure must not take down the research
+    task that triggered it.
     """
     if not config.SHOPIFY_ACCESS_TOKEN:
         return None
 
-    # Ask GPT to extract structured product info from the research
+    # Ask the LLM to extract structured product info from the research
     prompt = f"""Extract product listing details from this research report and return ONLY valid JSON.
 
 Research topic: {topic}
@@ -88,42 +92,29 @@ For price, use the estimated selling price from the research. If unclear, use "2
             raw = re.sub(r"```(?:json)?", "", raw).strip().rstrip("```").strip()
             product = json.loads(raw)
 
-    except Exception as e:
-        logger.error(f"Failed to extract product details: {e}")
-        return None
-
-    # Create the Shopify draft
-    try:
-        from tools.shopify_tools import shopify_url, get_headers
-        payload = {
-            "product": {
-                "title": product.get("title", topic),
-                "body_html": product.get("description", ""),
-                "product_type": product.get("product_type", ""),
-                "tags": product.get("tags", ""),
-                "variants": [{"price": product.get("price", "29.99")}],
-                "status": "draft",
-            }
+        shopify_payload = {
+            "title": product.get("title", topic),
+            "body_html": product.get("description", ""),
+            "product_type": product.get("product_type", ""),
+            "tags": product.get("tags", ""),
+            "variants": [{"price": product.get("price", "29.99")}],
+            "status": "draft",
         }
-        async with httpx.AsyncClient(timeout=15) as client:
-            res = await client.post(
-                shopify_url("products.json"),
-                json=payload,
-                headers=get_headers(),
-            )
-            if res.status_code not in (200, 201):
-                logger.error(f"Shopify draft creation failed: {res.status_code} {res.text}")
-                return None
-            created = res.json().get("product", {})
-            product_id = created.get("id")
-            if not product_id:
-                logger.error("Shopify response missing product id")
-                return None
-            shop = config.SHOPIFY_SHOP_URL.replace("https://", "").replace("http://", "").rstrip("/")
-            return f"https://{shop}/admin/products/{product_id}"
+
+        from tgbot.approvals import send_approval_request
+
+        action = await create_action(
+            type="create_shopify_product",
+            proposing_agent="researcher",
+            payload=shopify_payload,
+            idempotency_key=f"create_shopify_product:{task_id}",
+        )
+        if action.get("id"):
+            await send_approval_request(action)
+        return action
 
     except Exception as e:
-        logger.error(f"Shopify draft creation error: {e}")
+        logger.error(f"Failed to propose Shopify draft: {e}")
         return None
 
 
@@ -191,20 +182,16 @@ async def run_research_task(task_id: str, topic: str, research_type: str = "prod
             f"_Full results saved to dashboard._"
         )
 
-        # Auto-create Shopify draft if score is 7 or above
+        # Propose a Shopify draft if score is 7 or above -- awaits Telegram approval,
+        # does not create it automatically (see _propose_shopify_draft).
         if score >= 7 and research_type == "product":
             await send_telegram_message(
-                f"🏪 Score {score}/10 — creating Shopify draft listing for *{topic}*..."
+                f"🏪 Score {score}/10 — drafting a Shopify listing proposal for *{topic}*..."
             )
-            shopify_url_result = await _auto_create_shopify_draft(topic, result_text)
-            if shopify_url_result:
+            action = await _propose_shopify_draft(task_id, topic, result_text)
+            if not action:
                 await send_telegram_message(
-                    f"✅ Shopify draft created!\n\n"
-                    f"Review and publish it here:\n{shopify_url_result}"
-                )
-            else:
-                await send_telegram_message(
-                    f"⚠️ Couldn't auto-create the Shopify listing — do it manually from the research report."
+                    f"⚠️ Couldn't prepare a Shopify listing proposal — do it manually from the research report."
                 )
 
         logger.info(f"Research task {task_id} completed in {duration}s")
