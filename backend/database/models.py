@@ -69,3 +69,34 @@ class Memory(BaseModel):
     agent: Optional[str] = None
     content: str
     metadata: Optional[dict] = None
+
+
+class Action(BaseModel):
+    id: Optional[str] = None
+    created_at: Optional[datetime] = None
+    type: str  # create_shopify_product, update_shopify_product
+    proposing_agent: str
+    risk_level: str = "low"
+    status: str = "proposed"  # proposed, approved, rejected, executed, failed
+    idempotency_key: Optional[str] = None
+    payload: dict
+    before: Optional[dict] = None
+    result: Optional[dict] = None
+    error: Optional[str] = None
+
+
+class Approval(BaseModel):
+    id: Optional[str] = None
+    created_at: Optional[datetime] = None
+    action_id: str
+    decision: str  # approved, rejected
+    reason: Optional[str] = None
+    decided_by: Optional[str] = None
+
+
+class AuditLogEntry(BaseModel):
+    id: Optional[str] = None
+    created_at: Optional[datetime] = None
+    action_id: str
+    event: str  # proposed, approved, rejected, executed, failed
+    detail: Optional[dict] = None

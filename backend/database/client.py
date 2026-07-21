@@ -181,3 +181,95 @@ async def save_memory(agent: str, content: str, metadata: dict = None):
         "metadata": metadata or {},
     }
     supabase.table("memories").insert(record).execute()
+
+
+# ─────────────────────────────────────────
+# ACTIONS / APPROVALS / AUDIT LOG (Phase 1 approval gate)
+# ─────────────────────────────────────────
+
+async def _append_audit_log(action_id: str, event: str, detail: dict = None):
+    """Append-only lifecycle entry for an action. Internal -- called by the
+    functions below, never directly, so every action state change is always
+    accompanied by a trail entry."""
+    record = {"action_id": action_id, "event": event}
+    if detail is not None:
+        record["detail"] = detail
+    supabase.table("audit_log").insert(record).execute()
+
+
+async def get_action_by_idempotency_key(idempotency_key: str) -> Optional[dict]:
+    """Look up an existing action before proposing a duplicate (e.g. the same
+    research topic scoring 7+ twice shouldn't create two draft proposals)."""
+    result = supabase.table("actions").select("*").eq("idempotency_key", idempotency_key).execute()
+    return result.data[0] if result.data else None
+
+
+async def create_action(
+    type: str,
+    proposing_agent: str,
+    payload: dict,
+    before: dict = None,
+    risk_level: str = "low",
+    idempotency_key: str = None,
+) -> dict:
+    """Propose a new action awaiting approval. Status defaults to 'proposed'."""
+    record = {
+        "type": type,
+        "proposing_agent": proposing_agent,
+        "payload": payload,
+        "risk_level": risk_level,
+    }
+    if before is not None:
+        record["before"] = before
+    if idempotency_key:
+        record["idempotency_key"] = idempotency_key
+
+    result = supabase.table("actions").insert(record).execute()
+    action = result.data[0] if result.data else {}
+    if action.get("id"):
+        await _append_audit_log(action["id"], "proposed", {"payload": payload})
+    return action
+
+
+async def get_action(action_id: str) -> Optional[dict]:
+    """Get a single action by ID."""
+    result = supabase.table("actions").select("*").eq("id", action_id).execute()
+    return result.data[0] if result.data else None
+
+
+async def record_approval(
+    action_id: str,
+    decision: str,
+    reason: str = None,
+    decided_by: str = None,
+) -> dict:
+    """Record an approve/reject decision, update the action's status to match,
+    and audit-log it. decision must be 'approved' or 'rejected'."""
+    approval_record = {"action_id": action_id, "decision": decision}
+    if reason:
+        approval_record["reason"] = reason
+    if decided_by:
+        approval_record["decided_by"] = decided_by
+
+    result = supabase.table("approvals").insert(approval_record).execute()
+    approval = result.data[0] if result.data else {}
+
+    supabase.table("actions").update({"status": decision}).eq("id", action_id).execute()
+    await _append_audit_log(action_id, decision, {"reason": reason} if reason else None)
+    return approval
+
+
+async def mark_action_executed(action_id: str, result: dict = None):
+    """Mark an approved action as executed, storing its result, and audit-log it."""
+    updates = {"status": "executed"}
+    if result is not None:
+        updates["result"] = result
+    supabase.table("actions").update(updates).eq("id", action_id).execute()
+    await _append_audit_log(action_id, "executed", result)
+
+
+async def mark_action_failed(action_id: str, error: str):
+    """Mark an action as failed (e.g. execution errored after approval), storing
+    the error, and audit-log it."""
+    supabase.table("actions").update({"status": "failed", "error": error}).eq("id", action_id).execute()
+    await _append_audit_log(action_id, "failed", {"error": error})
