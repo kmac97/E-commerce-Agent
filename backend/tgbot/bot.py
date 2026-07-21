@@ -3,7 +3,7 @@
 
 import logging
 from telegram import Update, Bot
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram.ext import Application, CallbackQueryHandler, CommandHandler, MessageHandler, filters, ContextTypes
 from telegram.constants import ParseMode
 
 import config
@@ -23,6 +23,7 @@ from tgbot.commands import (
     cmd_trending,
     handle_message,
 )
+from tgbot.approvals import handle_approval_callback
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +90,9 @@ async def start_telegram_bot():
 
     # Handle plain text messages (chat with the assistant)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+
+    # Approve/Reject buttons on proposed actions (Phase 1 approval gate)
+    app.add_handler(CallbackQueryHandler(handle_approval_callback, pattern=r"^(approve|reject):"))
 
     logger.info("✅ Telegram bot polling started")
 

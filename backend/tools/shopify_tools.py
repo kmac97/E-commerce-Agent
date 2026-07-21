@@ -268,6 +268,19 @@ async def get_inventory(threshold: int = 10) -> list:
         return low
 
 
+async def create_product(payload: dict) -> dict:
+    """Create a new Shopify product. payload maps directly to Shopify's product
+    fields (title, body_html, product_type, tags, variants, status, etc.)."""
+    async with httpx.AsyncClient() as client:
+        res = await client.post(
+            shopify_url("products.json"),
+            json={"product": payload},
+            headers=get_headers(),
+        )
+        res.raise_for_status()
+        return res.json().get("product", {})
+
+
 async def update_product(product_id: str, updates: dict) -> dict:
     """Update a Shopify product by ID. updates dict can include title, body_html, variants etc."""
     async with httpx.AsyncClient() as client:
