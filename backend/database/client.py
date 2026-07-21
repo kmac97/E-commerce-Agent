@@ -260,9 +260,18 @@ async def record_approval(
     same action -- a double-tap on the Telegram button, or a redelivered
     callback -- can't both win: only whichever call actually flips the row
     gets an approval recorded and a non-None return. The caller must treat
-    None as "already decided elsewhere" and not proceed to execute."""
+    None as "already decided elsewhere" and not proceed to execute.
+
+    Also clears idempotency_key once decided. idempotency_key exists to
+    stop a second *pending* proposal for the same trigger piling up while
+    one is already awaiting a decision -- it's not meant to permanently
+    block ever proposing that same thing again after it's been resolved.
+    Since the column has a UNIQUE constraint, leaving the key in place
+    after a decision would make a future legitimate re-proposal (e.g.
+    clicking "push to Shopify" again on a product whose earlier proposal
+    was rejected) fail forever with a duplicate-key error."""
     claim = await supabase.table("actions").update(
-        {"status": decision}
+        {"status": decision, "idempotency_key": None}
     ).eq("id", action_id).eq("status", "proposed").execute()
     if not claim.data:
         return None

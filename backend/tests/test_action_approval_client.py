@@ -108,6 +108,10 @@ def _run():
         assert approval["decision"] == "approved"
         stored_action = await db_client.get_action(action_id)
         assert stored_action["status"] == "approved"
+        assert stored_action["idempotency_key"] is None, (
+            "idempotency_key must be cleared once decided -- otherwise the UNIQUE "
+            "constraint blocks ever proposing the same trigger again, forever"
+        )
         assert any(r["action_id"] == action_id and r["event"] == "approved" for r in audit_rows)
 
         # Mark it executed with a result.
@@ -154,6 +158,26 @@ def _run():
         assert len(approval_rows) == 1, "only the winning decision should be recorded"
         stored3 = await db_client.get_action(action3["id"])
         assert stored3["status"] == "approved", "the losing call must not flip status back"
+
+        # Real bug caught live in the dashboard: rejecting a proposal must
+        # not permanently block ever proposing that same product again --
+        # the idempotency_key clear above is what makes this possible.
+        key = "create_shopify_product:dashboard:prod-1"
+        first_proposal = await db_client.create_action(
+            type="create_shopify_product",
+            proposing_agent="dashboard",
+            payload={"title": "Glass Skin Kit"},
+            idempotency_key=key,
+        )
+        await db_client.record_approval(first_proposal["id"], "rejected", reason="not now")
+        second_proposal = await db_client.create_action(
+            type="create_shopify_product",
+            proposing_agent="dashboard",
+            payload={"title": "Glass Skin Kit"},
+            idempotency_key=key,
+        )
+        assert second_proposal["id"] != first_proposal["id"]
+        assert second_proposal["status"] == "proposed"
 
     asyncio.run(_check())
     print("approval-gate DB helper checks passed")
