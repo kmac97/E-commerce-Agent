@@ -30,6 +30,16 @@ OPENROUTER_FAST_MODEL = os.getenv("OPENROUTER_FAST_MODEL", "anthropic/claude-hai
 # non-Anthropic model for real redundancy against an Anthropic-specific outage.
 OPENROUTER_FALLBACK_MODEL = os.getenv("OPENROUTER_FALLBACK_MODEL", "openai/gpt-5.6-luna")
 
+# Research synthesis only (agents/researcher.py's CrewAI agent) -- a heavier
+# model than the OPENROUTER_MODEL default, deliberately scoped to just this
+# one low-frequency, high-value task (research is rate-limited to 10/hour)
+# rather than the build plan's full recommendation of Sonnet 5 for chat/
+# trending/listing-drafts too, to keep the cost increase small and
+# predictable. Sonnet 5 is ~2x Haiku 4.5 at intro pricing (through 2026-08-31),
+# ~3x after -- see AI_Store_Master_Plan.md's budget section before widening
+# this to any other call site.
+OPENROUTER_RESEARCH_MODEL = os.getenv("OPENROUTER_RESEARCH_MODEL", "anthropic/claude-sonnet-5")
+
 # Model settings
 MAX_TOKENS = 2000
 TEMPERATURE = 0.7

@@ -9,7 +9,7 @@ import config
 
 def get_llm():
     return LLM(
-        model=f"openrouter/{config.OPENROUTER_MODEL}",
+        model=f"openrouter/{config.OPENROUTER_RESEARCH_MODEL}",
         api_key=config.OPENROUTER_API_KEY,
         base_url=config.OPENROUTER_BASE_URL,
         max_tokens=4096,
