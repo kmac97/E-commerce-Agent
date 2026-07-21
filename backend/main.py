@@ -104,7 +104,7 @@ app.add_middleware(SlowAPIMiddleware)
 # ROUTES
 # ─────────────────────────────────────────
 
-from api import agents, research, dashboard  # noqa: E402
+from api import agents, research, dashboard, webhooks  # noqa: E402
 from api.auth import require_api_key  # noqa: E402
 
 _auth = [Depends(require_api_key)]
@@ -112,6 +112,9 @@ _auth = [Depends(require_api_key)]
 app.include_router(agents.router, prefix="/api/agents", tags=["Agents"], dependencies=_auth)
 app.include_router(research.router, prefix="/api/research", tags=["Research"], dependencies=_auth)
 app.include_router(dashboard.router, prefix="/api/dashboard", tags=["Dashboard"], dependencies=_auth)
+# No X-Api-Key dependency -- Shopify's delivery servers can't send it.
+# Authenticated instead via HMAC signature verification inside each route.
+app.include_router(webhooks.router, prefix="/webhooks/shopify", tags=["Webhooks"])
 
 
 @app.get("/")

@@ -105,6 +105,11 @@ SHOPIFY_SHOP_URL = os.getenv("SHOPIFY_STORE_URL") or os.getenv("SHOPIFY_SHOP_URL
 SHOPIFY_ACCESS_TOKEN = os.getenv("SHOPIFY_ACCESS_TOKEN")
 SHOPIFY_API_VERSION = "2026-07"
 
+# For verifying Shopify webhook HMAC signatures (api/webhooks.py). This is
+# the custom app's "API secret key" shown next to the Admin API access
+# token in Shopify admin -- not the access token itself.
+SHOPIFY_WEBHOOK_SECRET = os.getenv("SHOPIFY_WEBHOOK_SECRET")
+
 # ─────────────────────────────────────────
 # META ADS
 # ─────────────────────────────────────────

@@ -1,7 +1,9 @@
 # tgbot/store_monitor.py
 # Scheduled store health checks:
-#   - Low stock alerts
-#   - Price monitoring with competitor suggestions
+#   - Price monitoring with competitor suggestions (run_store_monitor's cron)
+#   - Low stock alerts (now real-time via api/webhooks.py's inventory
+#     webhook -- check_low_stock() stays here only for the manual
+#     /inventory command, not the automatic cron flow)
 # Run via cron or trigger with /inventory and /prices in Telegram.
 
 import asyncio
@@ -198,7 +200,9 @@ async def optimise_product_listing(product_id: str) -> str:
 
 
 async def run_store_monitor():
-    """Run all store checks and send alerts if needed."""
+    """Run the price-suggestion check and send an alert if needed. Low stock
+    is handled separately, in real time, by api/webhooks.py's inventory
+    webhook."""
     logger.info("Running store monitor...")
 
     try:
@@ -208,21 +212,6 @@ async def run_store_monitor():
         pass
 
     bot = Bot(token=config.TELEGRAM_BOT_TOKEN)
-
-    low_stock_msg = await check_low_stock(threshold=10)
-    if low_stock_msg:
-        try:
-            await bot.send_message(
-                chat_id=config.TELEGRAM_CHAT_ID,
-                text=low_stock_msg,
-                parse_mode=ParseMode.MARKDOWN,
-            )
-        except Exception:
-            await bot.send_message(
-                chat_id=config.TELEGRAM_CHAT_ID,
-                text=low_stock_msg,
-                parse_mode=None,
-            )
 
     price_msg = await get_price_suggestions()
     if price_msg:

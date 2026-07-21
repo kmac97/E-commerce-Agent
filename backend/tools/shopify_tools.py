@@ -478,6 +478,33 @@ async def update_product(product_id, updates: dict) -> dict:
     }
 
 
+_INVENTORY_ITEM_LOOKUP_QUERY = """
+query GetInventoryItemContext($id: ID!) {
+  inventoryItem(id: $id) {
+    variant {
+      title
+      product { title }
+    }
+  }
+}
+"""
+
+
+async def get_variant_context_for_inventory_item(inventory_item_id) -> dict | None:
+    """Resolve an inventory_levels/update webhook's bare inventory_item_id
+    (the payload has no product/variant title) to one for display."""
+    gid = f"gid://shopify/InventoryItem/{inventory_item_id}"
+    data = await graphql_request(_INVENTORY_ITEM_LOOKUP_QUERY, {"id": gid})
+    item = data.get("inventoryItem")
+    if not item or not item.get("variant"):
+        return None
+    variant = item["variant"]
+    return {
+        "product_title": variant["product"]["title"],
+        "variant_title": variant.get("title") or "Default",
+    }
+
+
 async def get_orders_summary() -> dict:
     # Note: Shopify's `read_orders` scope only returns orders from the last
     # 60 days by default (a platform-wide restriction, not specific to
