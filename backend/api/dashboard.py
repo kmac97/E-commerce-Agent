@@ -128,9 +128,9 @@ async def delete_product_item(product_id: str):
 @limiter.limit("20/hour")
 async def create_shopify_draft(request: Request, product_id: str):
     """Push a product to Shopify as a draft listing."""
-    import httpx
     import config
     from database.client import supabase
+    from tools.shopify_tools import create_product, ShopifyGraphQLError
 
     if not config.SHOPIFY_ACCESS_TOKEN or not config.SHOPIFY_SHOP_URL:
         return {"error": "Shopify not configured — add SHOPIFY_ACCESS_TOKEN and SHOPIFY_STORE_URL to .env"}
@@ -143,27 +143,22 @@ async def create_shopify_draft(request: Request, product_id: str):
     p = result.data[0]
     shop = config.SHOPIFY_SHOP_URL.replace("https://", "").replace("http://", "").rstrip("/")
 
-    async with httpx.AsyncClient(timeout=15.0) as client:
-        res = await client.post(
-            f"https://{shop}/admin/api/{config.SHOPIFY_API_VERSION}/products.json",
-            headers={"X-Shopify-Access-Token": config.SHOPIFY_ACCESS_TOKEN},
-            json={"product": {
-                "title": p["name"],
-                "body_html": p.get("notes") or "",
-                "status": "draft",
-                "tags": p.get("niche") or "",
-            }},
-        )
+    try:
+        draft = await create_product({
+            "title": p["name"],
+            "body_html": p.get("notes") or "",
+            "status": "draft",
+            "tags": p.get("niche") or "",
+        })
+    except ShopifyGraphQLError as e:
+        return {"error": f"Shopify error — {e}"}
 
-    if res.status_code == 201:
-        draft = res.json()["product"]
-        store_name = shop.replace(".myshopify.com", "")
-        return {
-            "shopify_id": draft["id"],
-            "url": f"https://admin.shopify.com/store/{store_name}/products/{draft['id']}",
-            "title": draft["title"],
-        }
-    return {"error": f"Shopify error ({res.status_code}) — check your access token"}
+    store_name = shop.replace(".myshopify.com", "")
+    return {
+        "shopify_id": draft["id"],
+        "url": f"https://admin.shopify.com/store/{store_name}/products/{draft['id']}",
+        "title": draft["title"],
+    }
 
 
 @router.get("/briefing")
@@ -201,26 +196,18 @@ async def get_briefing(request: Request):
 @limiter.limit("30/hour")
 async def get_revenue(request: Request, days: int = 30):
     """Daily revenue from Shopify for the last N days."""
-    import httpx
     import config
     from datetime import datetime, timedelta
     from collections import defaultdict
+    from tools.shopify_tools import get_orders
 
     if not config.SHOPIFY_ACCESS_TOKEN or not config.SHOPIFY_SHOP_URL:
         return []
 
-    shop = config.SHOPIFY_SHOP_URL.replace("https://", "").replace("http://", "").rstrip("/")
     since = (datetime.utcnow() - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     try:
-        async with httpx.AsyncClient(timeout=15) as client:
-            res = await client.get(
-                f"https://{shop}/admin/api/{config.SHOPIFY_API_VERSION}/orders.json",
-                headers={"X-Shopify-Access-Token": config.SHOPIFY_ACCESS_TOKEN},
-                params={"status": "any", "limit": 250, "created_at_min": since,
-                        "fields": "created_at,total_price,financial_status"},
-            )
-        orders = res.json().get("orders", []) if res.status_code == 200 else []
+        orders = await get_orders(status="any", limit=250, created_at_min=since)
     except Exception:
         return []
 

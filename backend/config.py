@@ -96,11 +96,14 @@ SERPER_API_KEY = os.getenv("SERPER_API_KEY")
 # SHOPIFY
 # ─────────────────────────────────────────
 
+# Single self-owned store, connected via a custom app's static Admin API
+# token (Shopify's recommended pattern for a private, non-distributed app) --
+# not OAuth. See Phase 3 build-plan note: a full OAuth install flow is for
+# apps installed on OTHER merchants' stores, which doesn't apply here or in
+# the planned replication model (each new store gets its own instance/token).
 SHOPIFY_SHOP_URL = os.getenv("SHOPIFY_STORE_URL") or os.getenv("SHOPIFY_SHOP_URL")
 SHOPIFY_ACCESS_TOKEN = os.getenv("SHOPIFY_ACCESS_TOKEN")
-SHOPIFY_CLIENT_ID = os.getenv("SHOPIFY_CLIENT_ID")
-SHOPIFY_CLIENT_SECRET = os.getenv("SHOPIFY_CLIENT_SECRET")
-SHOPIFY_API_VERSION = "2024-04"
+SHOPIFY_API_VERSION = "2026-07"
 
 # ─────────────────────────────────────────
 # META ADS

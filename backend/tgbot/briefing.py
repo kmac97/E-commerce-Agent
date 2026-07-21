@@ -7,7 +7,6 @@ import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
 
-import httpx
 from telegram import Bot
 from telegram.constants import ParseMode
 
@@ -21,26 +20,15 @@ async def get_orders_summary() -> dict:
     if not config.SHOPIFY_ACCESS_TOKEN:
         return None
     try:
-        shop = config.SHOPIFY_SHOP_URL.replace("https://", "").replace("http://", "").rstrip("/")
+        from tools.shopify_tools import get_orders
         yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%dT00:00:00Z")
-        async with httpx.AsyncClient(timeout=15) as client:
-            res = await client.get(
-                f"https://{shop}/admin/api/{config.SHOPIFY_API_VERSION}"
-                f"/orders.json?status=any&created_at_min={yesterday}&limit=250",
-                headers={
-                    "X-Shopify-Access-Token": config.SHOPIFY_ACCESS_TOKEN,
-                    "Content-Type": "application/json",
-                },
-            )
-            if res.status_code != 200:
-                return None
-            orders = res.json().get("orders", [])
-            revenue = sum(float(o.get("total_price", 0)) for o in orders)
-            return {
-                "count": len(orders),
-                "revenue": round(revenue, 2),
-                "currency": orders[0].get("currency", "USD") if orders else "USD",
-            }
+        orders = await get_orders(status="any", limit=250, created_at_min=yesterday)
+        revenue = sum(float(o.get("total_price") or 0) for o in orders)
+        return {
+            "count": len(orders),
+            "revenue": round(revenue, 2),
+            "currency": orders[0].get("currency", "USD") if orders else "USD",
+        }
     except Exception as e:
         logger.error(f"Orders fetch failed: {e}")
         return None
