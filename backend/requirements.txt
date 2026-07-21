@@ -1,25 +1,29 @@
+# Pinned to the versions confirmed running in production (VPS venv, via
+# `pip freeze`) for reproducible installs. See requirements-lock.txt for the
+# full transitive dependency closure. Bump intentionally, not via `>=` drift.
+
 # Core
-fastapi>=0.110.0
-uvicorn[standard]>=0.27.0
-python-dotenv>=1.0.0
+fastapi==0.137.1
+uvicorn[standard]==0.49.0
+python-dotenv==1.2.2
 
 # AI Agents
-crewai>=0.28.0
-crewai-tools>=0.1.0
-openai>=1.0.0          # OpenRouter uses the OpenAI SDK format
+crewai==1.14.7
+crewai-tools==1.14.7
+openai==2.43.0          # OpenRouter uses the OpenAI SDK format
 
 # Database
-supabase>=2.3.0
+supabase==2.31.0
 
 # Telegram Bot
-python-telegram-bot>=20.7
+python-telegram-bot==22.8
 
 # HTTP & Search
-httpx>=0.26.0
-requests>=2.31.0
-tavily-python>=0.3.0
+httpx==0.28.1
+requests==2.34.2
+tavily-python==0.7.26
 
 # Utilities
-pydantic>=2.5.0
-python-multipart>=0.0.9
-slowapi>=0.1.9
+pydantic==2.12.5
+python-multipart==0.0.32
+slowapi==0.1.10
