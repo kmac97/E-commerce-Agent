@@ -54,7 +54,7 @@ class _FakeQueryBuilder:
         self._limit = n
         return self
 
-    def execute(self):
+    async def execute(self):
         rows = self.store[self.table_name]
         if self._op == "insert":
             row = dict(self._data)
@@ -182,6 +182,32 @@ async def _run():
     assert "No handler registered" in row5["error"]
 
 
+async def _run_startup_resilience_check():
+    # If reclaim_orphaned_jobs blows up at startup (e.g. a transient Supabase
+    # hiccup), run_worker_loop must log it and keep going into the polling
+    # loop, not die silently -- asyncio.create_task swallows an unhandled
+    # exception with no visible symptom beyond "Task exception was never
+    # retrieved", and the worker would never run again for the process's life.
+    original_reclaim = job_worker.reclaim_orphaned_jobs
+
+    async def failing_reclaim(**_kw):
+        raise ConnectionError("simulated Supabase outage")
+
+    job_worker.reclaim_orphaned_jobs = failing_reclaim
+    job_worker.POLL_INTERVAL_SECONDS = 0.01  # don't actually wait 5s in a test
+    try:
+        # The loop runs forever once past the reclaim step -- if it survives
+        # long enough to hit the timeout below (rather than raising
+        # immediately), that proves the exception was caught, not propagated.
+        await asyncio.wait_for(job_worker.run_worker_loop(), timeout=0.2)
+        raise AssertionError("run_worker_loop should still be looping, not have returned")
+    except asyncio.TimeoutError:
+        pass  # expected -- it's still alive and polling
+    finally:
+        job_worker.reclaim_orphaned_jobs = original_reclaim
+
+
 if __name__ == "__main__":
     asyncio.run(_run())
+    asyncio.run(_run_startup_resilience_check())
     print("job worker checks passed")

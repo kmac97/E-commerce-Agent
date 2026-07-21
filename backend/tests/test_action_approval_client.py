@@ -46,7 +46,7 @@ class _FakeQuery:
         self._filters[col] = val
         return self
 
-    def execute(self):
+    async def execute(self):
         rows = self.store[self.table_name]
         if self._op == "insert":
             row = dict(self._data)

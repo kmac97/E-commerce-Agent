@@ -44,9 +44,17 @@ async def _run_one(job: dict):
 async def run_worker_loop():
     """Long-running polling loop -- started once at app startup alongside the
     Telegram bot (see main.py)."""
-    reclaimed = await reclaim_orphaned_jobs(timeout_minutes=ORPHAN_TIMEOUT_MINUTES)
-    if reclaimed:
-        logger.warning(f"Reclaimed {reclaimed} orphaned job(s) from a previous process")
+    try:
+        reclaimed = await reclaim_orphaned_jobs(timeout_minutes=ORPHAN_TIMEOUT_MINUTES)
+        if reclaimed:
+            logger.warning(f"Reclaimed {reclaimed} orphaned job(s) from a previous process")
+    except Exception as e:
+        # A transient Supabase hiccup here must not silently kill the whole
+        # worker task before it ever starts polling -- asyncio.create_task
+        # swallows an unhandled exception with no visible effect beyond a
+        # logged "Task exception was never retrieved", and the worker would
+        # never run again for the rest of this process's life.
+        logger.error(f"Orphan-reclaim at startup failed, continuing anyway: {e}")
     logger.info("Job worker loop started")
 
     while True:

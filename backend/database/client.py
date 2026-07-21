@@ -1,22 +1,31 @@
 # database/client.py
 # Supabase connection and all database operations.
+#
+# Uses supabase-py's native async client (create_async_client), not the sync
+# client wrapped in async def -- the sync client's .execute() is a blocking
+# network call, and every function in this file used to be `async def` while
+# still making that call directly. That blocked the entire event loop for
+# the duration of every DB query, freezing all other in-flight requests, the
+# Telegram bot's polling loop, and the job worker's loop for however long
+# Supabase took to respond. The async client's .execute() is a real
+# coroutine, so it actually yields control while waiting.
 
 import logging
 from typing import Optional
-from supabase import create_client, Client
+from supabase import create_async_client, AsyncClient
 
 import config
 
 logger = logging.getLogger(__name__)
 
 # Global Supabase client
-supabase: Client = None
+supabase: AsyncClient = None
 
 
 async def init_db():
     """Initialise the Supabase connection at startup."""
     global supabase
-    supabase = create_client(config.SUPABASE_URL, config.SUPABASE_KEY)
+    supabase = await create_async_client(config.SUPABASE_URL, config.SUPABASE_KEY)
     logger.info("✅ Supabase client initialised")
 
 
@@ -39,7 +48,7 @@ async def save_task_log(
         "status": status,
         "input": input or {},
     }
-    result = supabase.table("agent_tasks").insert(data).execute()
+    result = await supabase.table("agent_tasks").insert(data).execute()
     return result.data[0] if result.data else {}
 
 
@@ -59,12 +68,12 @@ async def update_task_log(
     if duration_seconds:
         updates["duration_seconds"] = duration_seconds
 
-    supabase.table("agent_tasks").update(updates).eq("id", task_id).execute()
+    await supabase.table("agent_tasks").update(updates).eq("id", task_id).execute()
 
 
 async def get_task(task_id: str) -> Optional[dict]:
     """Get a single task by ID."""
-    result = supabase.table("agent_tasks").select("*").eq("id", task_id).execute()
+    result = await supabase.table("agent_tasks").select("*").eq("id", task_id).execute()
     return result.data[0] if result.data else None
 
 
@@ -90,7 +99,7 @@ async def save_research(
     if notes:
         record["notes"] = notes
 
-    result = supabase.table("research").insert(record).execute()
+    result = await supabase.table("research").insert(record).execute()
     return result.data[0] if result.data else {}
 
 
@@ -99,24 +108,24 @@ async def get_research(type: str = None, limit: int = 20) -> list:
     query = supabase.table("research").select("*").order("created_at", desc=True).limit(limit)
     if type:
         query = query.eq("type", type)
-    result = query.execute()
+    result = await query.execute()
     return result.data
 
 
 async def get_research_by_id(research_id: str) -> Optional[dict]:
     """Get a single research item by ID."""
-    result = supabase.table("research").select("*").eq("id", research_id).execute()
+    result = await supabase.table("research").select("*").eq("id", research_id).execute()
     return result.data[0] if result.data else None
 
 
 async def update_research_fields(research_id: str, fields: dict):
     """Update arbitrary research fields (score, notes, etc)."""
-    supabase.table("research").update(fields).eq("id", research_id).execute()
+    await supabase.table("research").update(fields).eq("id", research_id).execute()
 
 
 async def delete_research(research_id: str):
     """Delete a research item."""
-    supabase.table("research").delete().eq("id", research_id).execute()
+    await supabase.table("research").delete().eq("id", research_id).execute()
 
 
 # ─────────────────────────────────────────
@@ -150,23 +159,23 @@ async def save_product(
     if data:
         record["data"] = data
 
-    result = supabase.table("products").insert(record).execute()
+    result = await supabase.table("products").insert(record).execute()
     return result.data[0] if result.data else {}
 
 
 async def update_product_status(product_id: str, status: str):
     """Update a product's status in the pipeline."""
-    supabase.table("products").update({"status": status}).eq("id", product_id).execute()
+    await supabase.table("products").update({"status": status}).eq("id", product_id).execute()
 
 
 async def update_product_fields(product_id: str, fields: dict):
     """Update arbitrary product fields."""
-    supabase.table("products").update(fields).eq("id", product_id).execute()
+    await supabase.table("products").update(fields).eq("id", product_id).execute()
 
 
 async def delete_product(product_id: str):
     """Delete a product from the pipeline."""
-    supabase.table("products").delete().eq("id", product_id).execute()
+    await supabase.table("products").delete().eq("id", product_id).execute()
 
 
 # ─────────────────────────────────────────
@@ -180,7 +189,7 @@ async def save_memory(agent: str, content: str, metadata: dict = None):
         "content": content,
         "metadata": metadata or {},
     }
-    supabase.table("memories").insert(record).execute()
+    await supabase.table("memories").insert(record).execute()
 
 
 # ─────────────────────────────────────────
@@ -194,13 +203,13 @@ async def _append_audit_log(action_id: str, event: str, detail: dict = None):
     record = {"action_id": action_id, "event": event}
     if detail is not None:
         record["detail"] = detail
-    supabase.table("audit_log").insert(record).execute()
+    await supabase.table("audit_log").insert(record).execute()
 
 
 async def get_action_by_idempotency_key(idempotency_key: str) -> Optional[dict]:
     """Look up an existing action before proposing a duplicate (e.g. the same
     research topic scoring 7+ twice shouldn't create two draft proposals)."""
-    result = supabase.table("actions").select("*").eq("idempotency_key", idempotency_key).execute()
+    result = await supabase.table("actions").select("*").eq("idempotency_key", idempotency_key).execute()
     return result.data[0] if result.data else None
 
 
@@ -224,7 +233,7 @@ async def create_action(
     if idempotency_key:
         record["idempotency_key"] = idempotency_key
 
-    result = supabase.table("actions").insert(record).execute()
+    result = await supabase.table("actions").insert(record).execute()
     action = result.data[0] if result.data else {}
     if action.get("id"):
         await _append_audit_log(action["id"], "proposed", {"payload": payload})
@@ -233,7 +242,7 @@ async def create_action(
 
 async def get_action(action_id: str) -> Optional[dict]:
     """Get a single action by ID."""
-    result = supabase.table("actions").select("*").eq("id", action_id).execute()
+    result = await supabase.table("actions").select("*").eq("id", action_id).execute()
     return result.data[0] if result.data else None
 
 
@@ -251,10 +260,10 @@ async def record_approval(
     if decided_by:
         approval_record["decided_by"] = decided_by
 
-    result = supabase.table("approvals").insert(approval_record).execute()
+    result = await supabase.table("approvals").insert(approval_record).execute()
     approval = result.data[0] if result.data else {}
 
-    supabase.table("actions").update({"status": decision}).eq("id", action_id).execute()
+    await supabase.table("actions").update({"status": decision}).eq("id", action_id).execute()
     await _append_audit_log(action_id, decision, {"reason": reason} if reason else None)
     return approval
 
@@ -264,14 +273,14 @@ async def mark_action_executed(action_id: str, result: dict = None):
     updates = {"status": "executed"}
     if result is not None:
         updates["result"] = result
-    supabase.table("actions").update(updates).eq("id", action_id).execute()
+    await supabase.table("actions").update(updates).eq("id", action_id).execute()
     await _append_audit_log(action_id, "executed", result)
 
 
 async def mark_action_failed(action_id: str, error: str):
     """Mark an action as failed (e.g. execution errored after approval), storing
     the error, and audit-log it."""
-    supabase.table("actions").update({"status": "failed", "error": error}).eq("id", action_id).execute()
+    await supabase.table("actions").update({"status": "failed", "error": error}).eq("id", action_id).execute()
     await _append_audit_log(action_id, "failed", {"error": error})
 
 
@@ -289,14 +298,14 @@ async def mark_action_failed(action_id: str, error: str):
 async def enqueue_job(type: str, payload: dict) -> dict:
     """Queue a durable background job. Survives a process restart, unlike
     BackgroundTasks/asyncio.create_task."""
-    result = supabase.table("jobs").insert({"type": type, "payload": payload}).execute()
+    result = await supabase.table("jobs").insert({"type": type, "payload": payload}).execute()
     return result.data[0] if result.data else {}
 
 
 async def claim_next_job() -> Optional[dict]:
     """Claim the oldest pending job, marking it 'running'."""
     result = (
-        supabase.table("jobs").select("*").eq("status", "pending")
+        await supabase.table("jobs").select("*").eq("status", "pending")
         .order("created_at").limit(1).execute()
     )
     if not result.data:
@@ -304,7 +313,7 @@ async def claim_next_job() -> Optional[dict]:
     job = result.data[0]
     from datetime import datetime, timezone
     now = datetime.now(timezone.utc).isoformat()
-    supabase.table("jobs").update({
+    await supabase.table("jobs").update({
         "status": "running",
         "locked_at": now,
         "attempts": (job.get("attempts") or 0) + 1,
@@ -316,12 +325,12 @@ async def claim_next_job() -> Optional[dict]:
 
 async def mark_job_complete(job_id: str):
     """Mark a job as successfully finished."""
-    supabase.table("jobs").update({"status": "complete"}).eq("id", job_id).execute()
+    await supabase.table("jobs").update({"status": "complete"}).eq("id", job_id).execute()
 
 
 async def mark_job_failed(job_id: str, error: str):
     """Mark a job as failed, storing the error."""
-    supabase.table("jobs").update({"status": "failed", "error": error}).eq("id", job_id).execute()
+    await supabase.table("jobs").update({"status": "failed", "error": error}).eq("id", job_id).execute()
 
 
 async def reclaim_orphaned_jobs(timeout_minutes: int = 30) -> int:
@@ -332,7 +341,7 @@ async def reclaim_orphaned_jobs(timeout_minutes: int = 30) -> int:
     Returns the count reclaimed."""
     from datetime import datetime, timezone, timedelta
     cutoff = datetime.now(timezone.utc) - timedelta(minutes=timeout_minutes)
-    result = supabase.table("jobs").select("*").eq("status", "running").execute()
+    result = await supabase.table("jobs").select("*").eq("status", "running").execute()
     reclaimed = 0
     for job in result.data:
         locked_at_raw = job.get("locked_at")
@@ -343,7 +352,7 @@ async def reclaim_orphaned_jobs(timeout_minutes: int = 30) -> int:
         except ValueError:
             continue
         if locked_at < cutoff:
-            supabase.table("jobs").update({
+            await supabase.table("jobs").update({
                 "status": "failed",
                 "error": "orphaned -- worker restarted or crashed mid-job",
             }).eq("id", job["id"]).execute()
