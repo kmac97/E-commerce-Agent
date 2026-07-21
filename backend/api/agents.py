@@ -3,10 +3,10 @@
 
 import logging
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
-from agents.crew import run_research_task
+from database.client import enqueue_job
 from api.rate_limit import limiter
 
 logger = logging.getLogger(__name__)
@@ -27,19 +27,18 @@ class TaskResponse(BaseModel):
 
 @router.post("/research", response_model=TaskResponse)
 @limiter.limit("10/hour")
-async def trigger_research(request: Request, body: ResearchRequest, background_tasks: BackgroundTasks):
+async def trigger_research(request: Request, body: ResearchRequest):
     """
     Trigger the research agent to investigate a product or niche.
-    Runs in the background — results saved to Supabase and sent via Telegram.
+    Queues a durable job (see agents/job_worker.py) -- results saved to
+    Supabase and sent via Telegram once the worker picks it up.
     """
     import uuid
     task_id = str(uuid.uuid4())
 
-    background_tasks.add_task(
-        run_research_task,
-        task_id=task_id,
-        topic=body.topic,
-        research_type=body.type,
+    await enqueue_job(
+        type="research_task",
+        payload={"task_id": task_id, "topic": body.topic, "research_type": body.type},
     )
 
     return TaskResponse(

@@ -110,14 +110,15 @@ async def cmd_research(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode=ParseMode.MARKDOWN,
     )
 
-    # Kick off the agent task
+    # Queue the research job (see agents/job_worker.py) -- durable, survives
+    # a process restart, unlike asyncio.create_task.
     import uuid
-    from agents.crew import run_research_task
-    import asyncio
+    from database.client import enqueue_job
 
     task_id = str(uuid.uuid4())
-    asyncio.create_task(
-        run_research_task(task_id=task_id, topic=topic, research_type=research_type)
+    await enqueue_job(
+        type="research_task",
+        payload={"task_id": task_id, "topic": topic, "research_type": research_type},
     )
 
 
@@ -339,7 +340,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     import httpx
     import uuid
-    import asyncio
     import config as cfg
 
     chat_id = update.effective_chat.id
@@ -441,12 +441,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 break
 
         task_id = str(uuid.uuid4())
-        asyncio.create_task(
-            run_research_task_from_chat(task_id=task_id, topic=topic, chat_id=chat_id)
-        )
+        await run_research_task_from_chat(task_id=task_id, topic=topic, chat_id=chat_id)
 
 
 async def run_research_task_from_chat(task_id: str, topic: str, chat_id: int):
-    """Wrapper to run research and send result back to the right chat."""
-    from agents.crew import run_research_task
-    await run_research_task(task_id=task_id, topic=topic, research_type="product")
+    """Queue a research job (see agents/job_worker.py). chat_id is accepted
+    for call-site compatibility but unused -- results always go to
+    config.TELEGRAM_CHAT_ID, the only chat this bot ever notifies."""
+    from database.client import enqueue_job
+    await enqueue_job(
+        type="research_task",
+        payload={"task_id": task_id, "topic": topic, "research_type": "product"},
+    )

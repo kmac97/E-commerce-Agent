@@ -273,3 +273,79 @@ async def mark_action_failed(action_id: str, error: str):
     the error, and audit-log it."""
     supabase.table("actions").update({"status": "failed", "error": error}).eq("id", action_id).execute()
     await _append_audit_log(action_id, "failed", {"error": error})
+
+
+# ─────────────────────────────────────────
+# JOBS (durable background task queue -- Phase 1.5)
+# ─────────────────────────────────────────
+#
+# ponytail: single-worker design (see agents/job_worker.py) -- claim_next_job
+# doesn't need atomic SELECT-FOR-UPDATE-SKIP-LOCKED semantics since there's
+# only ever one poller in this deployment (one VPS, one PM2 process). If this
+# ever runs as multiple worker processes, add a locked_by column and an
+# atomic claim (e.g. an RPC/stored procedure) to avoid two workers grabbing
+# the same row.
+
+async def enqueue_job(type: str, payload: dict) -> dict:
+    """Queue a durable background job. Survives a process restart, unlike
+    BackgroundTasks/asyncio.create_task."""
+    result = supabase.table("jobs").insert({"type": type, "payload": payload}).execute()
+    return result.data[0] if result.data else {}
+
+
+async def claim_next_job() -> Optional[dict]:
+    """Claim the oldest pending job, marking it 'running'."""
+    result = (
+        supabase.table("jobs").select("*").eq("status", "pending")
+        .order("created_at").limit(1).execute()
+    )
+    if not result.data:
+        return None
+    job = result.data[0]
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc).isoformat()
+    supabase.table("jobs").update({
+        "status": "running",
+        "locked_at": now,
+        "attempts": (job.get("attempts") or 0) + 1,
+    }).eq("id", job["id"]).execute()
+    job["status"] = "running"
+    job["locked_at"] = now
+    return job
+
+
+async def mark_job_complete(job_id: str):
+    """Mark a job as successfully finished."""
+    supabase.table("jobs").update({"status": "complete"}).eq("id", job_id).execute()
+
+
+async def mark_job_failed(job_id: str, error: str):
+    """Mark a job as failed, storing the error."""
+    supabase.table("jobs").update({"status": "failed", "error": error}).eq("id", job_id).execute()
+
+
+async def reclaim_orphaned_jobs(timeout_minutes: int = 30) -> int:
+    """Mark jobs stuck in 'running' past the timeout as failed -- their
+    worker died mid-job, most commonly because the process restarted.
+    Called once at worker startup, where ANY 'running' job is necessarily
+    orphaned (this process just started and hasn't claimed anything yet).
+    Returns the count reclaimed."""
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(minutes=timeout_minutes)
+    result = supabase.table("jobs").select("*").eq("status", "running").execute()
+    reclaimed = 0
+    for job in result.data:
+        locked_at_raw = job.get("locked_at")
+        if not locked_at_raw:
+            continue
+        try:
+            locked_at = datetime.fromisoformat(locked_at_raw.replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        if locked_at < cutoff:
+            supabase.table("jobs").update({
+                "status": "failed",
+                "error": "orphaned -- worker restarted or crashed mid-job",
+            }).eq("id", job["id"]).execute()
+            reclaimed += 1
+    return reclaimed

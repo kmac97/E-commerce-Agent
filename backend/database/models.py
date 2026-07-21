@@ -100,3 +100,14 @@ class AuditLogEntry(BaseModel):
     action_id: str
     event: str  # proposed, approved, rejected, executed, failed
     detail: Optional[dict] = None
+
+
+class Job(BaseModel):
+    id: Optional[str] = None
+    created_at: Optional[datetime] = None
+    type: str  # research_task
+    payload: dict
+    status: str = "pending"  # pending, running, complete, failed
+    attempts: int = 0
+    locked_at: Optional[datetime] = None
+    error: Optional[str] = None

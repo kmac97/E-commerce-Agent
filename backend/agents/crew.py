@@ -226,3 +226,10 @@ def build_full_crew():
         process=Process.hierarchical,
         verbose=True,
     )
+
+
+# Registers this as the handler for 'research_task' jobs on the durable
+# queue (agents/job_worker.py) -- runs at import time, so main.py's startup
+# just needs to import this module before starting the worker loop.
+from agents.job_worker import register_job_handler  # noqa: E402
+register_job_handler("research_task", run_research_task)

@@ -59,6 +59,13 @@ async def lifespan(app: FastAPI):
     asyncio.create_task(start_telegram_bot())
     logger.info("✅ Telegram bot started")
 
+    # Start the durable job worker (imports agents.crew first so its
+    # research_task handler is registered before the loop starts polling)
+    import agents.crew  # noqa: F401
+    from agents.job_worker import run_worker_loop
+    asyncio.create_task(run_worker_loop())
+    logger.info("✅ Job worker started")
+
     logger.info(f"✅ FastAPI running on http://{config.API_HOST}:{config.API_PORT}")
     logger.info(f"✅ Model: {config.OPENROUTER_MODEL}")
 
