@@ -1209,13 +1209,12 @@ async function analyseMyPipeline() {
 
 async function shopifyDraft(productId) {
   const btn = document.getElementById("shopify-draft-btn");
-  if (btn) { btn.disabled = true; btn.textContent = "Creating…"; }
+  if (btn) { btn.disabled = true; btn.textContent = "Proposing…"; }
   const res = await apiFetch(`/api/dashboard/products/${productId}/shopify-draft`, "POST");
-  if (res?.url) {
-    showToast("Draft created in Shopify ✓");
-    window.open(res.url, "_blank", "noopener");
+  if (res?.status === "proposed") {
+    showToast("Proposed — check Telegram to approve ✓");
   } else {
-    showToast(res?.error || "Failed to create draft", null, "error");
+    showToast(res?.error || "Failed to propose draft", null, "error");
   }
   if (btn) { btn.disabled = false; btn.textContent = "→ Shopify Draft"; }
 }
