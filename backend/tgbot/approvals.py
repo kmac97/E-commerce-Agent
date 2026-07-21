@@ -55,11 +55,15 @@ def _format_action_summary(action: dict) -> str:
         )
 
     if action["type"] == "update_shopify_product":
+        # Keys here match Shopify's own product fields (body_html, not
+        # "description") -- payload is passed straight through to Shopify by
+        # the executor with no translation, so this must use the same names
+        # or a real field change would silently show no diff here.
         lines = [f"✍️ *Listing update proposed* (product {payload.get('product_id', '?')})\n"]
         if payload.get("title") and before.get("title") != payload.get("title"):
             lines.append(f"*Title:*\n{before.get('title', '(none)')}\n→ {payload['title']}\n")
-        if payload.get("description") and before.get("description") != payload.get("description"):
-            lines.append(f"*Description:*\n{before.get('description', '(none)')}\n→ {payload['description']}\n")
+        if payload.get("body_html") and before.get("body_html") != payload.get("body_html"):
+            lines.append(f"*Description:*\n{before.get('body_html', '(none)')}\n→ {payload['body_html']}\n")
         return "\n".join(lines)
 
     return f"Action proposed: {action['type']}\n{payload}"

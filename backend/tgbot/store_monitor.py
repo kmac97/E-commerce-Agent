@@ -126,14 +126,16 @@ async def get_price_suggestions(limit: int = 5) -> str | None:
 
 async def optimise_product_listing(product_id: str) -> str:
     """
-    Use GPT to rewrite a product's title and description for better conversion,
-    then update it on Shopify.
+    Use the LLM to draft an improved title/description for a product, then
+    propose it as an `actions` row awaiting Telegram approval -- does NOT
+    update Shopify directly (see tgbot/approvals.py, which executes it once
+    approved).
     """
     if not config.SHOPIFY_ACCESS_TOKEN:
         return "Shopify not connected."
 
     try:
-        from tools.shopify_tools import get_products, update_product
+        from tools.shopify_tools import get_products
         products = await get_products(limit=250)
         product = next((p for p in products if str(p["id"]) == str(product_id)), None)
         if not product:
@@ -174,14 +176,28 @@ async def optimise_product_listing(product_id: str) -> str:
             raw = re.sub(r"```(?:json)?", "", raw).strip().rstrip("```").strip()
             improved = json.loads(raw)
 
-        # Update on Shopify
-        await update_product(product_id, {
-            "title": improved["title"],
-            "body_html": improved["description"],
-        })
+        # Propose the update -- no idempotency_key here (unlike the
+        # research-triggered draft proposal): /optimise is a manually
+        # repeatable action, and re-running it for the same product to get a
+        # fresh rewrite attempt is legitimate, not a duplicate-trigger bug.
+        from database.client import create_action
+        from tgbot.approvals import send_approval_request
+
+        action = await create_action(
+            type="update_shopify_product",
+            proposing_agent="store_monitor",
+            payload={
+                "product_id": product_id,
+                "title": improved["title"],
+                "body_html": improved["description"],
+            },
+            before={"title": current_title, "body_html": current_desc},
+        )
+        if action.get("id"):
+            await send_approval_request(action)
 
         return (
-            f"✅ *Listing optimised!*\n\n"
+            f"📝 *Listing update proposed — awaiting your approval*\n\n"
             f"*Before:* {current_title}\n"
             f"*After:* {improved['title']}\n\n"
             f"*New description:*\n{improved['description']}"
