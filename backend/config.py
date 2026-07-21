@@ -25,6 +25,11 @@ OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "anthropic/claude-haiku-4.5")
 # onto OPENROUTER_MODEL later without touching the extraction call sites.
 OPENROUTER_FAST_MODEL = os.getenv("OPENROUTER_FAST_MODEL", "anthropic/claude-haiku-4.5")
 
+# Fallback if the primary model/provider is unavailable (tools/llm_client.py
+# tries this after exhausting retries on the primary). Deliberately a
+# non-Anthropic model for real redundancy against an Anthropic-specific outage.
+OPENROUTER_FALLBACK_MODEL = os.getenv("OPENROUTER_FALLBACK_MODEL", "openai/gpt-5.6-luna")
+
 # Model settings
 MAX_TOKENS = 2000
 TEMPERATURE = 0.7
