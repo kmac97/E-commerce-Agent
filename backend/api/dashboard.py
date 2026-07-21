@@ -1,33 +1,38 @@
 # api/dashboard.py
 # Endpoints that power the web dashboard.
 
-from fastapi import APIRouter, Request
-from pydantic import BaseModel
-from typing import Optional
+from fastapi import APIRouter, Query, Request
+from pydantic import BaseModel, Field
+from typing import Literal, Optional
 
 from api.rate_limit import limiter
 
 router = APIRouter()
 
+# Matches frontend/app.js's VALID_STATUSES -- previously only clamped
+# client-side, with no equivalent enforcement here.
+ProductStatus = Literal["idea", "researching", "testing", "active", "dropped"]
+TaskStatus = Literal["pending", "running", "complete", "failed"]
+
 
 class ProductCreate(BaseModel):
     name: str
     niche: Optional[str] = None
-    score: Optional[int] = None
+    score: Optional[int] = Field(default=None, ge=1, le=10)
     notes: Optional[str] = None
 
 
 class StatusUpdate(BaseModel):
-    status: str
+    status: ProductStatus
 
 
 class ProductUpdate(BaseModel):
     name: Optional[str] = None
     niche: Optional[str] = None
-    score: Optional[int] = None
+    score: Optional[int] = Field(default=None, ge=1, le=10)
     notes: Optional[str] = None
-    cost_estimate: Optional[float] = None
-    sell_price_estimate: Optional[float] = None
+    cost_estimate: Optional[float] = Field(default=None, ge=0)
+    sell_price_estimate: Optional[float] = Field(default=None, ge=0)
     margin_estimate: Optional[float] = None
 
 
@@ -40,24 +45,24 @@ async def get_dashboard_summary():
     from database.client import supabase
 
     # Recent research (display only, keep small)
-    research = supabase.table("research").select("*").order(
+    research = await supabase.table("research").select("*").order(
         "created_at", desc=True
     ).limit(5).execute()
 
     # Recent agent tasks (display only)
-    tasks = supabase.table("agent_tasks").select("*").order(
+    tasks = await supabase.table("agent_tasks").select("*").order(
         "created_at", desc=True
     ).limit(10).execute()
 
     # Products — fetch up to 200 so status breakdown and stat count are accurate
-    products = supabase.table("products").select("*").order(
+    products = await supabase.table("products").select("*").order(
         "created_at", desc=True
     ).limit(200).execute()
 
     # Total counts for accurate dashboard stats
     try:
-        research_count = supabase.table("research").select("id", count="exact").execute()
-        tasks_count = supabase.table("agent_tasks").select("id", count="exact").execute()
+        research_count = await supabase.table("research").select("id", count="exact").execute()
+        tasks_count = await supabase.table("agent_tasks").select("id", count="exact").execute()
         total_research = research_count.count or len(research.data)
         total_tasks = tasks_count.count or len(tasks.data)
     except Exception:
@@ -75,13 +80,13 @@ async def get_dashboard_summary():
 
 
 @router.get("/products")
-async def get_products(status: str = None):
+async def get_products(status: Optional[ProductStatus] = None):
     """Get all products, optionally filtered by status."""
     from database.client import supabase
     query = supabase.table("products").select("*").order("created_at", desc=True)
     if status:
         query = query.eq("status", status)
-    result = query.execute()
+    result = await query.execute()
     return result.data
 
 
@@ -127,38 +132,45 @@ async def delete_product_item(product_id: str):
 @router.post("/products/{product_id}/shopify-draft")
 @limiter.limit("20/hour")
 async def create_shopify_draft(request: Request, product_id: str):
-    """Push a product to Shopify as a draft listing."""
+    """Propose pushing a product to Shopify as a draft listing -- creates an
+    `actions` row and sends a Telegram Approve/Reject request; nothing is
+    actually created on Shopify until you approve it (see
+    tgbot/approvals.py's ACTION_EXECUTORS, which do the real Shopify call)."""
     import config
-    from database.client import supabase
-    from tools.shopify_tools import create_product, ShopifyGraphQLError
+    from database.client import supabase, create_action
+    from tgbot.approvals import send_approval_request
 
     if not config.SHOPIFY_ACCESS_TOKEN or not config.SHOPIFY_SHOP_URL:
         return {"error": "Shopify not configured — add SHOPIFY_ACCESS_TOKEN and SHOPIFY_STORE_URL to .env"}
 
-    result = supabase.table("products").select("*").eq("id", product_id).execute()
+    result = await supabase.table("products").select("*").eq("id", product_id).execute()
     if not result.data:
         from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="Product not found")
 
     p = result.data[0]
-    shop = config.SHOPIFY_SHOP_URL.replace("https://", "").replace("http://", "").rstrip("/")
 
     try:
-        draft = await create_product({
-            "title": p["name"],
-            "body_html": p.get("notes") or "",
-            "status": "draft",
-            "tags": p.get("niche") or "",
-        })
-    except ShopifyGraphQLError as e:
-        return {"error": f"Shopify error — {e}"}
+        action = await create_action(
+            type="create_shopify_product",
+            proposing_agent="dashboard",
+            payload={
+                "title": p["name"],
+                "body_html": p.get("notes") or "",
+                "status": "draft",
+                "tags": p.get("niche") or "",
+            },
+            idempotency_key=f"create_shopify_product:dashboard:{product_id}",
+        )
+    except Exception as e:
+        # Most likely an idempotency_key collision -- this product already
+        # has a pending proposal awaiting a decision.
+        return {"error": f"Could not propose draft (already pending approval?): {e}"}
 
-    store_name = shop.replace(".myshopify.com", "")
-    return {
-        "shopify_id": draft["id"],
-        "url": f"https://admin.shopify.com/store/{store_name}/products/{draft['id']}",
-        "title": draft["title"],
-    }
+    if action.get("id"):
+        await send_approval_request(action)
+
+    return {"status": "proposed", "action_id": action.get("id")}
 
 
 @router.get("/briefing")
@@ -194,7 +206,7 @@ async def get_briefing(request: Request):
 
 @router.get("/revenue")
 @limiter.limit("30/hour")
-async def get_revenue(request: Request, days: int = 30):
+async def get_revenue(request: Request, days: int = Query(default=30, ge=1, le=365)):
     """Daily revenue from Shopify for the last N days."""
     import config
     from datetime import datetime, timedelta
@@ -225,7 +237,7 @@ async def get_revenue(request: Request, days: int = 30):
 
 
 @router.get("/tasks")
-async def get_tasks(status: str = None, limit: int = 50):
+async def get_tasks(status: Optional[TaskStatus] = None, limit: int = Query(default=50, ge=1, le=500)):
     """Get agent task history."""
     from database.client import supabase
     query = supabase.table("agent_tasks").select("*").order(
@@ -233,5 +245,5 @@ async def get_tasks(status: str = None, limit: int = 50):
     ).limit(limit)
     if status:
         query = query.eq("status", status)
-    result = query.execute()
+    result = await query.execute()
     return result.data

@@ -251,9 +251,22 @@ async def record_approval(
     decision: str,
     reason: str = None,
     decided_by: str = None,
-) -> dict:
+) -> Optional[dict]:
     """Record an approve/reject decision, update the action's status to match,
-    and audit-log it. decision must be 'approved' or 'rejected'."""
+    and audit-log it. decision must be 'approved' or 'rejected'.
+
+    The status flip is conditional on the action still being 'proposed'
+    (WHERE status = 'proposed'), so two near-simultaneous decisions on the
+    same action -- a double-tap on the Telegram button, or a redelivered
+    callback -- can't both win: only whichever call actually flips the row
+    gets an approval recorded and a non-None return. The caller must treat
+    None as "already decided elsewhere" and not proceed to execute."""
+    claim = await supabase.table("actions").update(
+        {"status": decision}
+    ).eq("id", action_id).eq("status", "proposed").execute()
+    if not claim.data:
+        return None
+
     approval_record = {"action_id": action_id, "decision": decision}
     if reason:
         approval_record["reason"] = reason
@@ -263,7 +276,6 @@ async def record_approval(
     result = await supabase.table("approvals").insert(approval_record).execute()
     approval = result.data[0] if result.data else {}
 
-    await supabase.table("actions").update({"status": decision}).eq("id", action_id).execute()
     await _append_audit_log(action_id, decision, {"reason": reason} if reason else None)
     return approval
 

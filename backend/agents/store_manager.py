@@ -22,16 +22,15 @@ def create_store_manager_agent() -> Agent:
     tools = []
 
     if config.SHOPIFY_ACCESS_TOKEN and config.SHOPIFY_SHOP_URL:
-        from tools.shopify_tools import (
-            GetProductsTool,
-            CreateProductTool,
-            UpdateProductTool,
-            GetOrdersTool,
-        )
+        # Read-only tools only -- this agent has no path to the actions/
+        # approvals gate (see tgbot/approvals.py), so it must not hold
+        # CreateProductTool/UpdateProductTool or it could write to Shopify
+        # with no human approval the moment something actually runs this
+        # crew (currently dormant: agents/crew.py's build_full_crew() isn't
+        # called anywhere, but don't rely on that staying true).
+        from tools.shopify_tools import GetProductsTool, GetOrdersTool
         tools = [
             GetProductsTool(),
-            CreateProductTool(),
-            UpdateProductTool(),
             GetOrdersTool(),
         ]
 

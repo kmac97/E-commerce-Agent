@@ -119,7 +119,13 @@ async def handle_approval_callback(update: Update, context: ContextTypes.DEFAULT
         return
 
     await query.answer("Approved ✅" if decision == "approved" else "Rejected")
-    await record_approval(action_id, decision, decided_by=str(update.effective_chat.id))
+    approval = await record_approval(action_id, decision, decided_by=str(update.effective_chat.id))
+    if approval is None:
+        # Lost the race to another near-simultaneous decision on this same
+        # action (double-tap, redelivered callback) -- someone else already
+        # claimed it between our status check above and this call.
+        await query.edit_message_text(f"⚠️ Already decided elsewhere — no action taken.")
+        return
 
     if decision == "rejected":
         await query.edit_message_text(f"❌ Rejected: {action['type']}")

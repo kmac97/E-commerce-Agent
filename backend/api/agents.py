@@ -228,7 +228,7 @@ async def find_products_agent():
     except Exception:
         return {"error": "Could not parse AI response"}
 
-    existing = supabase.table("products").select("name").execute()
+    existing = await supabase.table("products").select("name").execute()
     existing_names = {p["name"].lower() for p in (existing.data or [])}
 
     saved = []

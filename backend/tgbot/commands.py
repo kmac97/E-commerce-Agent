@@ -170,7 +170,7 @@ async def cmd_products(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Show the product pipeline"""
     from database.client import supabase
 
-    result = supabase.table("products").select("name, status, score").order(
+    result = await supabase.table("products").select("name, status, score").order(
         "created_at", desc=True
     ).limit(10).execute()
 
@@ -196,7 +196,7 @@ async def cmd_tasks(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Show recent agent tasks"""
     from database.client import supabase
 
-    result = supabase.table("agent_tasks").select(
+    result = await supabase.table("agent_tasks").select(
         "agent, task, status, created_at"
     ).order("created_at", desc=True).limit(8).execute()
 

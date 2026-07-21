@@ -39,7 +39,7 @@ async def get_recent_research() -> list:
     try:
         from database.client import supabase
         yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
-        result = (
+        result = await (
             supabase.table("research")
             .select("topic, type, score, created_at")
             .gte("created_at", yesterday)
@@ -58,7 +58,7 @@ async def get_recent_tasks() -> list:
     try:
         from database.client import supabase
         yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
-        result = (
+        result = await (
             supabase.table("agent_tasks")
             .select("agent, task, status, duration_seconds")
             .gte("created_at", yesterday)

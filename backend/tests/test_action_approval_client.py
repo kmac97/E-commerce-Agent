@@ -51,6 +51,8 @@ class _FakeQuery:
         if self._op == "insert":
             row = dict(self._data)
             row.setdefault("id", f"{self.table_name}-{len(rows) + 1}")
+            if self.table_name == "actions":
+                row.setdefault("status", "proposed")  # matches migration's DEFAULT 'proposed'
             rows.append(row)
             return _FakeResult([row])
         if self._op == "select":
@@ -134,6 +136,24 @@ def _run():
         stored2 = await db_client.get_action(action2["id"])
         assert stored2["status"] == "failed"
         assert stored2["error"] == "shopify API returned 500"
+
+        # Race guard: a second record_approval() call on an action that's
+        # already been decided (simulating a double-tap or a redelivered
+        # Telegram callback that both read 'proposed' before either wrote)
+        # must return None, not record a second approval or flip anything.
+        action3 = await db_client.create_action(
+            type="create_shopify_product",
+            proposing_agent="researcher",
+            payload={"title": "Race Widget", "price": "19.99"},
+        )
+        first = await db_client.record_approval(action3["id"], "approved", decided_by="111")
+        assert first is not None and first["decision"] == "approved"
+        second = await db_client.record_approval(action3["id"], "rejected", decided_by="222")
+        assert second is None, "a second decision on an already-decided action must return None"
+        approval_rows = [r for r in db_client.supabase.store["approvals"] if r["action_id"] == action3["id"]]
+        assert len(approval_rows) == 1, "only the winning decision should be recorded"
+        stored3 = await db_client.get_action(action3["id"])
+        assert stored3["status"] == "approved", "the losing call must not flip status back"
 
     asyncio.run(_check())
     print("approval-gate DB helper checks passed")
