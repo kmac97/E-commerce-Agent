@@ -1,110 +1,91 @@
 # 🗺️ E-commerce AI Agent — Roadmap
 
----
+This roadmap uses the same phase numbers as [`CLAUDE_CODE_BUILD_PLAN.md`](CLAUDE_CODE_BUILD_PLAN.md) (the technical/security plan this project has actually been built against). [`AI_Store_Master_Plan.md`](AI_Store_Master_Plan.md) has the business side — budget, niche-scoring methodology, compliance basics — most relevant once Phase 5 starts.
 
-## ✅ Phase 1 — Foundation (Now)
-**Goal:** Everything connected, agents running, Telegram working, dashboard live.
-
-- [x] Project structure
-- [x] README and docs
-- [ ] Supabase tables created
-- [ ] FastAPI backend running on Hostinger VPS
-- [ ] OpenRouter + Hermes 3 connected
-- [ ] First agent working (Researcher)
-- [ ] Telegram bot running (basic commands)
-- [ ] Web dashboard deployed to Vercel
-- [ ] `.env` configured with all keys
-
-**You get:** A live system you can talk to from Telegram and see in your browser.
+**Operating model:** every action that spends money or writes to Shopify goes through a Telegram Approve/Reject gate first. There's no autonomy-tier switch — that's the only mode right now, deliberately.
 
 ---
 
-## 🔜 Phase 2 — Research Intelligence
-**Goal:** The agent can research products and niches autonomously, score them, and save results.
+## ✅ Phase 0 — Security & Foundation
+**Goal:** Lock the backend down before building anything else on top of it.
 
-- [ ] Product research agent (full)
-- [ ] Niche finder with scoring (1–10)
-- [ ] Competitor snapshot (brand name or URL input)
-- [ ] Trending product detection (Serper + TikTok search)
-- [ ] Results saved to Supabase
-- [ ] Dashboard shows research history
-- [ ] Telegram: `/research posture correctors` → full report sent to phone
+- [x] API key auth on every route, CORS restricted to real origins
+- [x] Rate limiting on expensive/costed endpoints
+- [x] Telegram bot restricted to the owner's chat ID only
+- [x] SSRF protections on user-supplied-URL endpoints
+- [x] Frontend XSS sanitization
+- [x] Model config reconciled onto OpenRouter (no more per-file drift)
+- [x] Legacy v1 prototype removed
 
-**You get:** A real research tool. Ask it to research any product, it goes and does it.
-
----
-
-## 🔜 Phase 3 — Shopify Integration
-**Goal:** The agent can manage your Shopify store directly.
-
-- [ ] Shopify API connected
-- [ ] Create and edit product listings
-- [ ] Optimise product titles and descriptions
-- [ ] Monitor orders and inventory
-- [ ] Automated low-stock alerts via Telegram
-- [ ] Price monitoring and adjustment suggestions
-- [ ] Telegram: `/orders` → today's orders summary
-
-**You get:** The agent manages your store. You approve big decisions, it handles the rest.
+**Got:** A backend that isn't wide open to anyone who finds the URL.
 
 ---
 
-## 🔜 Phase 4 — Marketing Automation
-**Goal:** The agent creates and manages your ad campaigns.
+## ✅ Phase 1 — Approval Gate + Durable Jobs
+**Goal:** Nothing spends money or writes to Shopify without a human tapping Approve.
 
-- [ ] Meta Ads API connected
-- [ ] TikTok Ads API connected
-- [ ] Ad copy generator (headlines, body, CTA)
-- [ ] UGC script writer
-- [ ] Hook generator (10 variations per product)
-- [ ] Campaign performance reports
-- [ ] Underperforming ad alerts
-- [ ] Telegram: `/ad-report` → today's Meta spend and ROAS
+- [x] `actions` / `approvals` / `audit_log` tables — full proposal → decision → execution trail
+- [x] Telegram Approve/Reject buttons wired into every Shopify-write path
+- [x] Durable job queue (`jobs` table + worker loop) — research tasks survive a process restart, not just `asyncio.create_task`
+- [x] Idempotency keys prevent duplicate proposals for the same trigger
 
-**You get:** The agent writes your ads and tells you what's working.
+**Got:** A live system you can talk to from Telegram and see in your browser, with nothing able to spend money or publish without your approval.
 
 ---
 
-## 🔜 Phase 5 — Customer Operations
-**Goal:** The agent handles customer communication autonomously.
+## ✅ Phase 2 — Reliability Cleanup
+**Goal:** Make the thing that's running actually robust.
 
-- [ ] Gmail API connected
-- [ ] Auto-read and categorise incoming emails
-- [ ] Draft replies for approval or auto-send
-- [ ] Refund and return response templates
-- [ ] Shipping delay notifications
-- [ ] Review monitoring (Shopify + Judge.me)
-- [ ] Auto-respond to positive reviews
-- [ ] Flag negative reviews for your attention
-- [ ] Telegram: `/reviews` → today's reviews summary
+- [x] Shared LLM call helper — retry/backoff, timeout, fallback model on provider outage
+- [x] Async Supabase client throughout (no more blocking the event loop on every DB call)
+- [x] Model tiering: Haiku 4.5 default, Sonnet 5 for research synthesis only, GPT-5.6 Luna as fallback
+- [x] Pinned dependency versions + a full lock file
 
-**You get:** Customer support runs itself. You only handle escalations.
+**Got:** A backend that degrades gracefully instead of silently breaking under load or a provider hiccup.
 
 ---
 
-## 🔜 Phase 6 — Full Autonomy & Intelligence
-**Goal:** The system runs the business day-to-day with minimal input from you.
+## ✅ Phase 3 — Shopify Integration
+**Goal:** Talk to Shopify the way that isn't on a deprecation clock.
 
-- [ ] Scheduled daily briefing via Telegram (revenue, orders, ad spend, issues)
-- [ ] Weekly performance report to email
-- [ ] P&L tracking and margin alerts
-- [ ] Agent memory using pgvector (Supabase) — remembers every decision
-- [ ] Multi-store support
-- [ ] Supplier research and outreach drafts
-- [ ] Business health score (daily)
-- [ ] Anomaly detection (sudden traffic drop, spike in refunds, etc.)
+- [x] Migrated `shopify_tools.py` from REST (deprecated for products/variants since 2024-04) to the GraphQL Admin API
+- [x] Custom-app static access token — no OAuth flow, since this is one self-owned store, not an app installed on other merchants' stores
 
-**You get:** A business that largely runs itself. You make the big calls, the agent does the work.
+**Got:** Product research → draft proposal → Telegram approval → real Shopify draft, all on a supported API.
+
+---
+
+## ✅ Phase 4 — Monitoring
+**Goal:** Know what's happening in the store without polling for it.
+
+- [x] Real-time Shopify webhooks (HMAC-verified) for new orders and low stock, replacing cron polling
+- [x] Manual `/inventory`, `/orders`, `/prices` checks still available on demand
+
+**Deferred to Phase 5:** wiring the Support agent to real email/review tools — `email_tools.py`/`review_tools.py` need Gmail OAuth and a Judge.me signup that don't exist yet, and there's no live customer/review activity to act on until the store has real traffic.
+
+**Got:** A Telegram ping the moment an order comes in or stock gets low, instead of finding out on the next scheduled check.
+
+---
+
+## 🔜 Phase 5 — Marketing & Spend
+**Goal:** The agent drafts and manages ad campaigns; you approve spend.
+
+- [ ] Meta Ads API connected (primary/only ad channel — TikTok's ~$50/day platform minimum doesn't fit the budget, see master plan Section 3.2)
+- [ ] Ad copy generator, AI-generated creative carries the required "AI-generated" disclosure label (Meta policy)
+- [ ] Every campaign launch and budget change requires Telegram approval, hard spend caps enforced in code
+- [ ] Support agent wired to real Gmail + Judge.me tools (deferred from Phase 4), draft-only, routed through the same approval gate
+
+**Will get:** The agent drafts your ads and campaigns and drafts customer replies; you approve spend, creative, and sends before anything goes out.
 
 ---
 
 ## Timeline
 
-| Phase | Effort | Dependency |
+| Phase | Status | Dependency |
 |-------|--------|-----------|
-| Phase 1 | 1–2 sessions | OpenRouter key, Telegram bot, Supabase |
-| Phase 2 | 2–3 sessions | Serper API key |
-| Phase 3 | 2–3 sessions | Shopify store live |
-| Phase 4 | 3–4 sessions | Meta/TikTok developer access |
-| Phase 5 | 2–3 sessions | Gmail API credentials |
-| Phase 6 | 2–3 sessions | All above complete |
+| Phase 0 | ✅ Done | — |
+| Phase 1 | ✅ Done | Supabase, Telegram bot |
+| Phase 2 | ✅ Done | — |
+| Phase 3 | ✅ Done | Shopify store live |
+| Phase 4 | ✅ Done | Shopify webhooks registered |
+| Phase 5 | 🔜 Not started | Meta Business verification, Gmail API credentials, Judge.me account |
