@@ -36,3 +36,13 @@ CREATE TABLE audit_log (
   event TEXT NOT NULL,              -- 'proposed', 'approved', 'rejected', 'executed', 'failed'
   detail JSONB
 );
+
+-- This app has no per-user Supabase auth context -- one FastAPI backend,
+-- one shared key, access gated at the API-key/Telegram-owner layer instead.
+-- Supabase's SQL editor auto-enables RLS on new tables by default with no
+-- policies, which blocks every insert/update. Disable it here to match the
+-- rest of the schema (research/agent_tasks/products/etc., created before
+-- that default existed).
+ALTER TABLE actions DISABLE ROW LEVEL SECURITY;
+ALTER TABLE approvals DISABLE ROW LEVEL SECURITY;
+ALTER TABLE audit_log DISABLE ROW LEVEL SECURITY;

@@ -12,3 +12,9 @@ CREATE TABLE jobs (
   locked_at TIMESTAMPTZ,
   error TEXT
 );
+
+-- See 001's matching note: no per-user Supabase auth context in this app,
+-- so RLS (auto-enabled by Supabase's SQL editor on new tables) just blocks
+-- every insert with no policy to grant it. Disabled to match the rest of
+-- the schema.
+ALTER TABLE jobs DISABLE ROW LEVEL SECURITY;
