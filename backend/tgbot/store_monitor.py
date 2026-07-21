@@ -60,6 +60,8 @@ async def get_price_suggestions(limit: int = 5) -> str | None:
             return None
 
         suggestions = []
+        from tools.llm_client import call_llm
+
         async with httpx.AsyncClient(timeout=20) as client:
             for p in active[:3]:  # Limit to 3 to save API credits
                 title = p["title"]
@@ -85,32 +87,25 @@ async def get_price_suggestions(limit: int = 5) -> str | None:
                     snippets = ""
 
                 if snippets:
-                    # Ask GPT for a price suggestion
-                    gpt_res = await client.post(
-                        "https://openrouter.ai/api/v1/chat/completions",
-                        headers={
-                            "Authorization": f"Bearer {config.OPENROUTER_API_KEY}",
-                            "Content-Type": "application/json",
-                        },
-                        json={
-                            "model": config.OPENROUTER_MODEL,
-                            "messages": [
-                                {
-                                    "role": "user",
-                                    "content": (
-                                        f"Product: {title}\n"
-                                        f"My current price: ${current_price}\n"
-                                        f"Market data: {snippets[:500]}\n\n"
-                                        f"In one sentence: should I raise, lower, or keep my price? "
-                                        f"Be specific with a suggested price if relevant."
-                                    ),
-                                }
-                            ],
-                            "max_tokens": 80,
-                            "temperature": 0.5,
-                        },
+                    # Ask the LLM for a price suggestion
+                    suggestion = await call_llm(
+                        messages=[
+                            {
+                                "role": "user",
+                                "content": (
+                                    f"Product: {title}\n"
+                                    f"My current price: ${current_price}\n"
+                                    f"Market data: {snippets[:500]}\n\n"
+                                    f"In one sentence: should I raise, lower, or keep my price? "
+                                    f"Be specific with a suggested price if relevant."
+                                ),
+                            }
+                        ],
+                        model=config.OPENROUTER_MODEL,
+                        max_tokens=80,
+                        temperature=0.5,
+                        timeout=20,
                     )
-                    suggestion = gpt_res.json()["choices"][0]["message"]["content"].strip()
                     suggestions.append(f"• *{title}* (${current_price})\n  {suggestion}")
 
         if not suggestions:
@@ -145,36 +140,30 @@ async def optimise_product_listing(product_id: str) -> str:
         current_desc = product.get("body_html", "")
         price = product.get("variants", [{}])[0].get("price", "?")
 
-        async with httpx.AsyncClient(timeout=25) as client:
-            res = await client.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {config.OPENROUTER_API_KEY}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "model": config.OPENROUTER_MODEL,
-                    "messages": [
-                        {
-                            "role": "user",
-                            "content": (
-                                f"Rewrite this Shopify product listing for better conversion.\n\n"
-                                f"Current title: {current_title}\n"
-                                f"Current description: {current_desc[:500]}\n"
-                                f"Price: ${price}\n\n"
-                                f"Return ONLY valid JSON, no markdown:\n"
-                                f'{{"title": "improved title", "description": "improved 2-3 sentence description"}}'
-                            ),
-                        }
-                    ],
-                    "max_tokens": 300,
-                    "temperature": 0.7,
-                },
-            )
-            import re, json
-            raw = res.json()["choices"][0]["message"]["content"].strip()
-            raw = re.sub(r"```(?:json)?", "", raw).strip().rstrip("```").strip()
-            improved = json.loads(raw)
+        from tools.llm_client import call_llm
+        import re, json
+
+        raw = await call_llm(
+            messages=[
+                {
+                    "role": "user",
+                    "content": (
+                        f"Rewrite this Shopify product listing for better conversion.\n\n"
+                        f"Current title: {current_title}\n"
+                        f"Current description: {current_desc[:500]}\n"
+                        f"Price: ${price}\n\n"
+                        f"Return ONLY valid JSON, no markdown:\n"
+                        f'{{"title": "improved title", "description": "improved 2-3 sentence description"}}'
+                    ),
+                }
+            ],
+            model=config.OPENROUTER_MODEL,
+            max_tokens=300,
+            temperature=0.7,
+            timeout=25,
+        )
+        raw = re.sub(r"```(?:json)?", "", raw).strip().rstrip("```").strip()
+        improved = json.loads(raw)
 
         # Propose the update -- no idempotency_key here (unlike the
         # research-triggered draft proposal): /optimise is a manually

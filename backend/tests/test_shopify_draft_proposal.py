@@ -128,10 +128,13 @@ import httpx  # noqa: E402
 import tgbot.approvals as approvals  # noqa: E402
 
 
-# ── fake httpx (the LLM extraction call) ──
+# ── fake httpx (the LLM extraction call, via tools/llm_client.py's call_llm,
+# which checks status_code before parsing) ──
 class _FakeResponse:
-    def __init__(self, data):
+    def __init__(self, data, status_code=200):
         self._data = data
+        self.status_code = status_code
+        self.text = str(data)
 
     def json(self):
         return self._data

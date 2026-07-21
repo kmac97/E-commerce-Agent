@@ -6,7 +6,6 @@ import re
 import json
 from datetime import datetime
 
-import httpx
 from crewai import Crew, Process
 
 from agents.researcher import create_researcher_agent, create_research_task
@@ -71,26 +70,18 @@ Return this exact JSON structure (no markdown, no explanation):
 For price, use the estimated selling price from the research. If unclear, use "29.99"."""
 
     try:
-        async with httpx.AsyncClient(timeout=20) as client:
-            res = await client.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {config.OPENROUTER_API_KEY}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "model": config.OPENROUTER_FAST_MODEL,
-                    "messages": [{"role": "user", "content": prompt}],
-                    "max_tokens": 400,
-                    "temperature": 0.2,
-                },
-            )
-            data = res.json()
-            raw = data["choices"][0]["message"]["content"].strip()
+        from tools.llm_client import call_llm
 
-            # Strip markdown code fences if present
-            raw = re.sub(r"```(?:json)?", "", raw).strip().rstrip("```").strip()
-            product = json.loads(raw)
+        raw = await call_llm(
+            messages=[{"role": "user", "content": prompt}],
+            model=config.OPENROUTER_FAST_MODEL,
+            max_tokens=400,
+            temperature=0.2,
+            timeout=20,
+        )
+        # Strip markdown code fences if present
+        raw = re.sub(r"```(?:json)?", "", raw).strip().rstrip("```").strip()
+        product = json.loads(raw)
 
         shopify_payload = {
             "title": product.get("title", topic),

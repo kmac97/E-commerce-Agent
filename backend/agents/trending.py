@@ -94,23 +94,17 @@ Format each product clearly with a header like "🔥 Product 1: [name]".
 Be specific and use the data provided. Today's date is 2026."""
 
     try:
-        async with httpx.AsyncClient(timeout=30) as client:
-            res = await client.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {config.OPENROUTER_API_KEY}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "model": config.OPENROUTER_MODEL,
-                    "messages": [{"role": "user", "content": prompt}],
-                    "max_tokens": 800,
-                    "temperature": 0.7,
-                },
-            )
-            report = res.json()["choices"][0]["message"]["content"].strip()
+        from tools.llm_client import call_llm
+
+        report = await call_llm(
+            messages=[{"role": "user", "content": prompt}],
+            model=config.OPENROUTER_MODEL,
+            max_tokens=800,
+            temperature=0.7,
+            timeout=30,
+        )
     except Exception as e:
-        logger.error(f"GPT trending analysis failed: {e}")
+        logger.error(f"Trending analysis failed: {e}")
         return "❌ Failed to analyse trending products. Try again."
 
     today = __import__('datetime').date.today()

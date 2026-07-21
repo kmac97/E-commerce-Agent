@@ -140,33 +140,26 @@ async def build_briefing() -> str:
 async def get_max_tip(context: str) -> str:
     """Ask Max for a one-line insight or action based on today's data."""
     try:
-        async with httpx.AsyncClient(timeout=20) as client:
-            res = await client.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {config.OPENROUTER_API_KEY}",
-                    "Content-Type": "application/json",
+        from tools.llm_client import call_llm
+
+        return await call_llm(
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are Max, a sharp e-commerce business partner. "
+                        "Based on this daily briefing data, give ONE short, specific, "
+                        "actionable insight or recommendation. "
+                        "2 sentences max. No fluff. Be direct."
+                    ),
                 },
-                json={
-                    "model": config.OPENROUTER_FAST_MODEL,
-                    "messages": [
-                        {
-                            "role": "system",
-                            "content": (
-                                "You are Max, a sharp e-commerce business partner. "
-                                "Based on this daily briefing data, give ONE short, specific, "
-                                "actionable insight or recommendation. "
-                                "2 sentences max. No fluff. Be direct."
-                            ),
-                        },
-                        {"role": "user", "content": context},
-                    ],
-                    "max_tokens": 100,
-                    "temperature": 0.8,
-                },
-            )
-            data = res.json()
-            return data["choices"][0]["message"]["content"].strip()
+                {"role": "user", "content": context},
+            ],
+            model=config.OPENROUTER_FAST_MODEL,
+            max_tokens=100,
+            temperature=0.8,
+            timeout=20,
+        )
     except Exception as e:
         logger.error(f"Max tip failed: {e}")
         return ""

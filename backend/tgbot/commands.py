@@ -386,30 +386,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     messages = [{"role": "system", "content": system}] + history
 
-    # Call OpenRouter directly (faster than CrewAI for chat)
+    # Call the LLM directly (faster than CrewAI for chat)
+    from tools.llm_client import call_llm, LLMCallError
+    import re as _re
     try:
-        async with httpx.AsyncClient(timeout=30) as client:
-            res = await client.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {cfg.OPENROUTER_API_KEY}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "model": cfg.OPENROUTER_MODEL,
-                    "messages": messages,
-                    "max_tokens": 500,
-                    "temperature": 0.85,
-                },
-            )
-            data = res.json()
-            import re as _re
-            try:
-                reply = _re.sub(r'\[\d+\]', '', data["choices"][0]["message"]["content"]).strip()
-            except (KeyError, IndexError, TypeError):
-                logger.error(f"OpenRouter error response: {data}")
-                reply = "Something went wrong on my end — try again in a sec."
-    except Exception as e:
+        raw_reply = await call_llm(
+            messages=messages, model=cfg.OPENROUTER_MODEL, max_tokens=500, temperature=0.85, timeout=30,
+        )
+        reply = _re.sub(r'\[\d+\]', '', raw_reply).strip()
+    except LLMCallError as e:
         logger.error(f"Chat LLM error: {e}")
         reply = "Something went wrong on my end — try again in a sec."
 

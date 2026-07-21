@@ -67,7 +67,7 @@ class ChatRequest(BaseModel):
 @limiter.limit("10/hour")
 async def import_product_from_url(request: Request, body: dict):
     """Fetch a product URL and extract structured product data using AI."""
-    import httpx, json, re
+    import json, re
     import config as cfg
     from tools.safe_fetch import safe_get, UnsafeURLError
 
@@ -94,15 +94,14 @@ async def import_product_from_url(request: Request, body: dict):
     )
 
     try:
-        async with httpx.AsyncClient(timeout=30) as client:
-            r = await client.post(
-                f"{cfg.OPENROUTER_BASE_URL}/chat/completions",
-                headers={"Authorization": f"Bearer {cfg.OPENROUTER_API_KEY}"},
-                json={"model": cfg.OPENROUTER_FAST_MODEL,
-                      "messages": [{"role": "user", "content": prompt}],
-                      "max_tokens": 200, "temperature": 0.2},
-            )
-        reply = r.json()["choices"][0]["message"]["content"]
+        from tools.llm_client import call_llm
+        reply = await call_llm(
+            messages=[{"role": "user", "content": prompt}],
+            model=cfg.OPENROUTER_FAST_MODEL,
+            max_tokens=200,
+            temperature=0.2,
+            timeout=30,
+        )
         match = re.search(r"\{.*\}", reply, re.DOTALL)
         return json.loads(match.group()) if match else {"error": "Could not parse product details"}
     except Exception as e:
@@ -192,38 +191,33 @@ async def find_products_agent():
 
     context = "\n\n".join(snippets)[:6000]
 
-    async with httpx.AsyncClient(timeout=45) as client:
-        r = await client.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers={"Authorization": f"Bearer {cfg.OPENROUTER_API_KEY}", "Content-Type": "application/json"},
-            json={
-                "model": cfg.OPENROUTER_FAST_MODEL,
-                "messages": [
-                    {
-                        "role": "system",
-                        "content": (
-                            "You are an expert e-commerce product researcher. "
-                            "From the search results below, extract REAL SPECIFIC products that people are buying right now. "
-                            "These must be actual named products someone can source and resell — not categories or vague ideas. "
-                            "Good examples: 'Magnetic Phone Wallet Card Holder', 'LED Strip Lights 5M RGB USB', 'Portable Blender USB 6-Blade Mini'. "
-                            "Bad examples: 'fitness equipment', 'home decor', 'tech gadgets'. "
-                            "For each product: estimate AliExpress/wholesale cost_estimate (USD), typical sell_price_estimate (USD), "
-                            "score 1-10 (trend strength × margin potential), and write notes explaining why it is trending with specific evidence. "
-                            "Return ONLY a JSON array, no other text:\n"
-                            '[{"name":"...","niche":"...","score":8,"cost_estimate":3.50,"sell_price_estimate":19.99,"notes":"..."}]'
-                        ),
-                    },
-                    {"role": "user", "content": f"Extract 6–8 real products from this research:\n\n{context}"},
-                ],
-                "max_tokens": 2000,
-                "temperature": 0.2,
-            },
-        )
-        ai = r.json()
+    from tools.llm_client import call_llm, LLMCallError
 
     try:
-        raw = ai["choices"][0]["message"]["content"].strip()
-    except (KeyError, IndexError, TypeError):
+        raw = await call_llm(
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are an expert e-commerce product researcher. "
+                        "From the search results below, extract REAL SPECIFIC products that people are buying right now. "
+                        "These must be actual named products someone can source and resell — not categories or vague ideas. "
+                        "Good examples: 'Magnetic Phone Wallet Card Holder', 'LED Strip Lights 5M RGB USB', 'Portable Blender USB 6-Blade Mini'. "
+                        "Bad examples: 'fitness equipment', 'home decor', 'tech gadgets'. "
+                        "For each product: estimate AliExpress/wholesale cost_estimate (USD), typical sell_price_estimate (USD), "
+                        "score 1-10 (trend strength × margin potential), and write notes explaining why it is trending with specific evidence. "
+                        "Return ONLY a JSON array, no other text:\n"
+                        '[{"name":"...","niche":"...","score":8,"cost_estimate":3.50,"sell_price_estimate":19.99,"notes":"..."}]'
+                    ),
+                },
+                {"role": "user", "content": f"Extract 6–8 real products from this research:\n\n{context}"},
+            ],
+            model=cfg.OPENROUTER_FAST_MODEL,
+            max_tokens=2000,
+            temperature=0.2,
+            timeout=45,
+        )
+    except LLMCallError:
         return {"error": "AI service unavailable — try again"}
     match = re.search(r"\[.*\]", raw, re.DOTALL)
     if not match:
@@ -309,18 +303,15 @@ async def chat_with_max(request: Request, body: ChatRequest):
     messages += body.history[-20:]
     messages.append({"role": "user", "content": body.message})
 
-    async with httpx.AsyncClient(timeout=45) as client:
-        res = await client.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers={"Authorization": f"Bearer {cfg.OPENROUTER_API_KEY}", "Content-Type": "application/json"},
-            json={"model": cfg.OPENROUTER_MODEL, "messages": messages, "max_tokens": 700, "temperature": 0.85},
+    from tools.llm_client import call_llm, LLMCallError
+    import re as _re
+    try:
+        raw_reply = await call_llm(
+            messages=messages, model=cfg.OPENROUTER_MODEL, max_tokens=700, temperature=0.85, timeout=45,
         )
-        data = res.json()
-        import re as _re
-        try:
-            reply = _re.sub(r'\[\d+\]', '', data["choices"][0]["message"]["content"]).strip()
-        except (KeyError, IndexError, TypeError):
-            logger.error(f"OpenRouter error response: {data}")
-            reply = "I'm having trouble connecting right now — try again in a second."
+        reply = _re.sub(r'\[\d+\]', '', raw_reply).strip()
+    except LLMCallError as e:
+        logger.error(f"Chat LLM call failed: {e}")
+        reply = "I'm having trouble connecting right now — try again in a second."
 
     return {"reply": reply}
